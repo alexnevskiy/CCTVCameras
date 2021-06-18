@@ -28,7 +28,9 @@ function inter = planeFrustumIntersect(X,V0,camPos,upRight,upLeft,downRight,down
         end
     end
     
-    for i = 4:-1:1
+    [m, ~] = size(inter);
+    
+    for i = m:-1:1
         if (inter(i,:) == [0 0 0])
             inter(i,:) = [];
         end 
