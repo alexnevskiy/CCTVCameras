@@ -26,12 +26,11 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleCl
     V0 = [0 1 0];               % Любая точка на плоскости пола
 
     % Нахождение точек пересечения frustum с плоскостью пола
-    [posUpRightNear,checkUpRightNear,posUpLeftNear,checkUpLeftNear,posDownRightNear,checkDownRightNear,...
-        posDownLeftNear,checkDownLeftNear] = planeFrustumIntersect(X,V0,camPos,upRightNear,upLeftNear,downRightNear,downLeftNear);
-    [posUpRightMid,checkUpRightMid,posUpLeftMid,checkUpLeftMid,posDownRightMid,checkDownRightMid,...
-        posDownLeftMid,checkDownLeftMid] = planeFrustumIntersect(X,V0,camPos,upRightMid,upLeftMid,downRightMid,downLeftMid);
-    [posUpRightFar,checkUpRightFar,posUpLeftFar,checkUpLeftFar,posDownRightFar,checkDownRightFar,...
-        posDownLeftFar,checkDownLeftFar] = planeFrustumIntersect(X,V0,camPos,upRightFar,upLeftFar,downRightFar,downLeftFar);
+    planeInterNear = planeFrustumIntersect(X,V0,camPos,upRightNear,upLeftNear,downRightNear,downLeftNear);
+    planeInterMid = planeTruncFrustumIntersect(X,V0,upRightNear,upLeftNear,downRightNear,downLeftNear,...
+        upRightMid,upLeftMid,downRightMid,downLeftMid);
+    planeInterFar = planeTruncFrustumIntersect(X,V0,upRightMid,upLeftMid,downRightMid,downLeftMid,...
+        upRightFar,upLeftFar,downRightFar,downLeftFar);
 
     f = figure;
     nColor = 'red';
@@ -40,20 +39,32 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleCl
 
     % Если рёбра frustum пересекают плоскость пола, то строим пересечение на
     % графике
-    [interNear,posUpRightNear,checkUpRightNear,posUpLeftNear,checkUpLeftNear] ...
-        = plotPlaneFrustumIntersect(posUpRightNear,checkUpRightNear,posUpLeftNear,...
-        checkUpLeftNear,posDownRightNear,checkDownRightNear,...
-        posDownLeftNear,checkDownLeftNear,X,V0,downRightNear,upRightNear,downLeftNear,upLeftNear,nColor);
+    [mNear, ~] = size(planeInterNear);
+    if (mNear < 3)
+        interNear = fill3([0 0 0], [0 0 0], [0 0 0], nColor);
+        hold on
+    else
+        interNear = fill3(planeInterNear(:,1),planeInterNear(:,2),planeInterNear(:,3),nColor);
+        hold on
+    end
     
-    [interMid,posUpRightMid,checkUpRightMid,posUpLeftMid,checkUpLeftMid] ...
-        = plotPlaneFrustumIntersect(posUpRightMid,checkUpRightMid,posUpLeftMid,...
-        checkUpLeftMid,posUpRightNear,checkUpRightNear,...
-        posUpLeftNear,checkUpLeftNear,X,V0,downRightMid,upRightMid,downLeftMid,upLeftMid,mColor);
-    
-    [interFar,posUpRightFar,checkUpRightFar,posUpLeftFar,checkUpLeftFar] ...
-        = plotPlaneFrustumIntersect(posUpRightFar,checkUpRightFar,posUpLeftFar,...
-        checkUpLeftFar,posUpRightMid,checkUpRightMid,...
-        posUpLeftMid,checkUpLeftMid,X,V0,downRightFar,upRightFar,downLeftFar,upLeftFar,fColor);
+    [mMid, ~] = size(planeInterMid);
+    if (mMid < 3)
+        interMid = fill3([0 0 0], [0 0 0], [0 0 0], mColor);
+        hold on
+    else
+        interMid = fill3(planeInterMid(:,1),planeInterMid(:,2),planeInterMid(:,3),mColor);
+        hold on
+    end
+
+    [mFar, ~] = size(planeInterFar);
+    if (mFar < 3)
+        interFar = fill3([0 0 0], [0 0 0], [0 0 0], fColor);
+        hold on
+    else
+        interFar = fill3(planeInterFar(:,1),planeInterFar(:,2),planeInterFar(:,3),fColor);
+        hold on
+    end
 
     % Построение frustum`ов
     PNear = [upRightNear; upLeftNear; downLeftNear; downRightNear; camPos];
@@ -169,7 +180,25 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleCl
                   'Value', fovV, 'String', fovV, 'Callback', {@update3DPointS});
     uicontrol('Parent',f,'Style','text','Position',[81*3+distH,25+distV,50,23],...
                     'String','FOV Vertical','BackgroundColor',bgcolor);
+                
+    bFrustumNear = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54,110,23],...
+                   'Value', 1, 'String', 'Near Frustum', 'Callback', {@update3DPointS});
+               
+    bFrustumMid = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV/2,110,23],...
+                   'Value', 1, 'String', 'Middle Frustum', 'Callback', {@update3DPointS});
 
+    bFrustumFar = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV,110,23],...
+                   'Value', 1, 'String', 'Far Frustum', 'Callback', {@update3DPointS});
+    
+    bInterNear = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+141,54,110,23],...
+                   'Value', 1, 'String', 'Near Intersection', 'Callback', {@update3DPointS});
+               
+    bInterMid = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+141,54+distV/2,110,23],...
+                   'Value', 1, 'String', 'Middle Intersection', 'Callback', {@update3DPointS});
+
+    bInterFar = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+141,54+distV,110,23],...
+                   'Value', 1, 'String', 'Far Intersection', 'Callback', {@update3DPointS});
+    
     function update3DPointS(~,~)
         pan = get(bPan,'Value');
         tilt = get(bTilt,'Value');
@@ -182,6 +211,12 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleCl
         farClipPlane = str2double(get(bFarClipPlane,'String'));
         fovH = str2double(get(bFovH,'String'));
         fovV = str2double(get(bFovV,'String'));
+        nearFrustumCheck = get(bFrustumNear,'Value');
+        midFrustumCheck = get(bFrustumMid,'Value');
+        farFrustumCheck = get(bFrustumFar,'Value');
+        nearInterCheck = get(bInterNear,'Value');
+        midInterCheck = get(bInterMid,'Value');
+        farInterCheck = get(bInterFar,'Value');
         
         camPos = [camPosX camPosY camPosZ];
 
@@ -205,49 +240,102 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleCl
         [upRightFar,upLeftFar,downRightFar,downLeftFar] = findFrustumBase(fcpCenter,fovHTan,fovVTan,R,farClipPlane);
         
         % Нахождение точек пересечения frustum с плоскостью пола
-        [posUpRightNear,checkUpRightNear,posUpLeftNear,checkUpLeftNear,posDownRightNear,checkDownRightNear,...
-            posDownLeftNear,checkDownLeftNear] = planeFrustumIntersect(X,V0,camPos,upRightNear,upLeftNear,downRightNear,downLeftNear);
-        [posUpRightMid,checkUpRightMid,posUpLeftMid,checkUpLeftMid,posDownRightMid,checkDownRightMid,...
-            posDownLeftMid,checkDownLeftMid] = planeFrustumIntersect(X,V0,camPos,upRightMid,upLeftMid,downRightMid,downLeftMid);
-        [posUpRightFar,checkUpRightFar,posUpLeftFar,checkUpLeftFar,posDownRightFar,checkDownRightFar,...
-            posDownLeftFar,checkDownLeftFar] = planeFrustumIntersect(X,V0,camPos,upRightFar,upLeftFar,downRightFar,downLeftFar);
+        planeInterNear = planeFrustumIntersect(X,V0,camPos,upRightNear,upLeftNear,downRightNear,downLeftNear);
+        planeInterMid = planeTruncFrustumIntersect(X,V0,upRightNear,upLeftNear,downRightNear,downLeftNear,...
+            upRightMid,upLeftMid,downRightMid,downLeftMid);
+        planeInterFar = planeTruncFrustumIntersect(X,V0,upRightMid,upLeftMid,downRightMid,downLeftMid,...
+            upRightFar,upLeftFar,downRightFar,downLeftFar);
 
         % Если рёбра frustum пересекают плоскость пола, то строим пересечение на
         % графике
-        [interNear,posUpRightNear,checkUpRightNear,posUpLeftNear,checkUpLeftNear] ...
-            = plotSetPlaneFrustumIntersect(posUpRightNear,checkUpRightNear,posUpLeftNear,...
-            checkUpLeftNear,posDownRightNear,checkDownRightNear,...
-            posDownLeftNear,checkDownLeftNear,X,V0,downRightNear,upRightNear,downLeftNear,upLeftNear,interNear);
-    
-        [interMid,posUpRightMid,checkUpRightMid,posUpLeftMid,checkUpLeftMid] ...
-            = plotSetPlaneFrustumIntersect(posUpRightMid,checkUpRightMid,posUpLeftMid,...
-            checkUpLeftMid,posUpRightNear,checkUpRightNear,...
-            posUpLeftNear,checkUpLeftNear,X,V0,downRightMid,upRightMid,downLeftMid,upLeftMid,interMid);
-    
-        [interFar,posUpRightFar,checkUpRightFar,posUpLeftFar,checkUpLeftFar] ...
-            = plotSetPlaneFrustumIntersect(posUpRightFar,checkUpRightFar,posUpLeftFar,...
-            checkUpLeftFar,posUpRightMid,checkUpRightMid,...
-            posUpLeftMid,checkUpLeftMid,X,V0,downRightFar,upRightFar,downLeftFar,upLeftFar,interFar);
+        if nearInterCheck == 1
+            set(interNear, 'visible', 'on');
+            [mNear, ~] = size(planeInterNear);
+            if (mNear < 3)
+                set(interNear, 'XData', [0 0 0], 'YData', [0 0 0], 'ZData', [0 0 0]);
+            else
+                set(interNear, 'XData', planeInterNear(:,1), 'YData', planeInterNear(:,2), 'ZData', planeInterNear(:,3));
+            end
+        else
+            set(interNear, 'visible', 'off');
+        end
+
+        if midInterCheck == 1
+            set(interMid, 'visible', 'on');
+            [mMid, ~] = size(planeInterMid);
+            if (mMid < 3)
+                set(interMid, 'XData', [0 0 0], 'YData', [0 0 0], 'ZData', [0 0 0]);
+            else
+                set(interMid, 'XData', planeInterMid(:,1), 'YData', planeInterMid(:,2), 'ZData', planeInterMid(:,3));
+            end
+        else
+            set(interMid, 'visible', 'off');
+        end
+
+        if farInterCheck == 1
+            set(interFar, 'visible', 'on');
+            [mFar, ~] = size(planeInterFar);
+            if (mFar < 3)
+                set(interFar, 'XData', [0 0 0], 'YData', [0 0 0], 'ZData', [0 0 0]);
+            else
+                set(interFar, 'XData', planeInterFar(:,1), 'YData', planeInterFar(:,2), 'ZData', planeInterFar(:,3));
+            end
+        else
+            set(interFar, 'visible', 'off');
+        end
 
         % Переопределение построенных frustum`ов
-        PNear = [upRightNear; upLeftNear; downLeftNear; downRightNear; camPos];
-        set(frustumUpNear, 'XData', PNear(indUpF, 1), 'YData', PNear(indUpF, 2), 'ZData', PNear(indUpF, 3));
-        set(frustumLeftNear, 'XData', PNear(indLeftF, 1), 'YData', PNear(indLeftF, 2), 'ZData', PNear(indLeftF, 3));
-        set(frustumDownNear, 'XData', PNear(indDownF, 1), 'YData', PNear(indDownF, 2), 'ZData', PNear(indDownF, 3));
-        set(frustumRightNear, 'XData', PNear(indRightF, 1), 'YData', PNear(indRightF, 2), 'ZData', PNear(indRightF, 3));
-        
-        PMid = [upRightNear; upLeftNear; downLeftNear; downRightNear; ...
-            upRightMid; upLeftMid; downLeftMid; downRightMid];
-        set(frustumUpMid, 'XData', PMid(indUp, 1), 'YData', PMid(indUp, 2), 'ZData', PMid(indUp, 3));
-        set(frustumLeftMid, 'XData', PMid(indLeft, 1), 'YData', PMid(indLeft, 2), 'ZData', PMid(indLeft, 3));
-        set(frustumDownMid, 'XData', PMid(indDown, 1), 'YData', PMid(indDown, 2), 'ZData', PMid(indDown, 3));
-        set(frustumRightMid, 'XData', PMid(indRight, 1), 'YData', PMid(indRight, 2), 'ZData', PMid(indRight, 3));
-
-        PFar = [upRightMid; upLeftMid; downLeftMid; downRightMid; ...
-            upRightFar; upLeftFar; downLeftFar; downRightFar];
-        set(frustumUpFar, 'XData', PFar(indUp, 1), 'YData', PFar(indUp, 2), 'ZData', PFar(indUp, 3));
-        set(frustumLeftFar, 'XData', PFar(indLeft, 1), 'YData', PFar(indLeft, 2), 'ZData', PFar(indLeft, 3));
-        set(frustumDownFar, 'XData', PFar(indDown, 1), 'YData', PFar(indDown, 2), 'ZData', PFar(indDown, 3));
-        set(frustumRightFar, 'XData', PFar(indRight, 1), 'YData', PFar(indRight, 2), 'ZData', PFar(indRight, 3));
+        if nearFrustumCheck == 1
+            set(frustumUpNear, 'visible', 'on');
+            set(frustumLeftNear, 'visible', 'on');
+            set(frustumDownNear, 'visible', 'on');
+            set(frustumRightNear, 'visible', 'on');
+            PNear = [upRightNear; upLeftNear; downLeftNear; downRightNear; camPos];
+            set(frustumUpNear, 'XData', PNear(indUpF, 1), 'YData', PNear(indUpF, 2), 'ZData', PNear(indUpF, 3));
+            set(frustumLeftNear, 'XData', PNear(indLeftF, 1), 'YData', PNear(indLeftF, 2), 'ZData', PNear(indLeftF, 3));
+            set(frustumDownNear, 'XData', PNear(indDownF, 1), 'YData', PNear(indDownF, 2), 'ZData', PNear(indDownF, 3));
+            set(frustumRightNear, 'XData', PNear(indRightF, 1), 'YData', PNear(indRightF, 2), 'ZData', PNear(indRightF, 3));
+        else
+            set(frustumUpNear, 'visible', 'off');
+            set(frustumLeftNear, 'visible', 'off');
+            set(frustumDownNear, 'visible', 'off');
+            set(frustumRightNear, 'visible', 'off');
         end
+        
+        if midFrustumCheck == 1
+            set(frustumUpMid, 'visible', 'on');
+            set(frustumLeftMid, 'visible', 'on');
+            set(frustumDownMid, 'visible', 'on');
+            set(frustumRightMid, 'visible', 'on');
+            PMid = [upRightNear; upLeftNear; downLeftNear; downRightNear; ...
+                upRightMid; upLeftMid; downLeftMid; downRightMid];
+            set(frustumUpMid, 'XData', PMid(indUp, 1), 'YData', PMid(indUp, 2), 'ZData', PMid(indUp, 3));
+            set(frustumLeftMid, 'XData', PMid(indLeft, 1), 'YData', PMid(indLeft, 2), 'ZData', PMid(indLeft, 3));
+            set(frustumDownMid, 'XData', PMid(indDown, 1), 'YData', PMid(indDown, 2), 'ZData', PMid(indDown, 3));
+            set(frustumRightMid, 'XData', PMid(indRight, 1), 'YData', PMid(indRight, 2), 'ZData', PMid(indRight, 3));
+        else
+            set(frustumUpMid, 'visible', 'off');
+            set(frustumLeftMid, 'visible', 'off');
+            set(frustumDownMid, 'visible', 'off');
+            set(frustumRightMid, 'visible', 'off');
+        end
+
+        if farFrustumCheck == 1
+            set(frustumUpFar, 'visible', 'on');
+            set(frustumLeftFar, 'visible', 'on');
+            set(frustumDownFar, 'visible', 'on');
+            set(frustumRightFar, 'visible', 'on');
+            PFar = [upRightMid; upLeftMid; downLeftMid; downRightMid; ...
+                upRightFar; upLeftFar; downLeftFar; downRightFar];
+            set(frustumUpFar, 'XData', PFar(indUp, 1), 'YData', PFar(indUp, 2), 'ZData', PFar(indUp, 3));
+            set(frustumLeftFar, 'XData', PFar(indLeft, 1), 'YData', PFar(indLeft, 2), 'ZData', PFar(indLeft, 3));
+            set(frustumDownFar, 'XData', PFar(indDown, 1), 'YData', PFar(indDown, 2), 'ZData', PFar(indDown, 3));
+            set(frustumRightFar, 'XData', PFar(indRight, 1), 'YData', PFar(indRight, 2), 'ZData', PFar(indRight, 3));
+        else
+            set(frustumUpFar, 'visible', 'off');
+            set(frustumLeftFar, 'visible', 'off');
+            set(frustumDownFar, 'visible', 'off');
+            set(frustumRightFar, 'visible', 'off');
+        end
+    end
 end
