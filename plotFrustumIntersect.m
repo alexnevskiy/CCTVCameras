@@ -1,4 +1,5 @@
-function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleClipPlane,farClipPlane,camPos,length)
+function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
+    nearClipPlane,middleClipPlane,farClipPlane,camPos,length,heightLimit)
     % aspect = W / H;         % Соотношение сторон камеры
     
     fovHTan = tan(fovH / 2 / 180 * pi);
@@ -25,17 +26,32 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleCl
     D = [length -length 0];
     V0 = [0 1 0];               % Любая точка на плоскости пола
 
-    % Нахождение точек пересечения frustum с плоскостью пола
+    % Нахождение точек пересечения frustum'ов с плоскостью пола
     planeInterNear = planeFrustumIntersect(X,V0,camPos,upRightNear,upLeftNear,downRightNear,downLeftNear);
     planeInterMid = planeTruncFrustumIntersect(X,V0,upRightNear,upLeftNear,downRightNear,downLeftNear,...
         upRightMid,upLeftMid,downRightMid,downLeftMid);
     planeInterFar = planeTruncFrustumIntersect(X,V0,upRightMid,upLeftMid,downRightMid,downLeftMid,...
         upRightFar,upLeftFar,downRightFar,downLeftFar);
+    
+    % Определение плоскости ограничения по высоте
+    V1 = [0 1 heightLimit];                 % Любая точка на плоскости пола
+    X1 = [0 0 heightLimit + 1];             % Вектор нормали плоскости
+    
+    % Нахождение точек пересечения полного frustum с плоскостью ограничения
+    % по высоте
+    planeInterLimit = planeFrustumIntersect(X1,V1,camPos,upRightFar,upLeftFar,downRightFar,downLeftFar);
+    
+    % Нахождение точек пересечения полного frustum с плоскостью пола
+    planeInterFloor = planeFrustumIntersect(X,V0,camPos,upRightFar,upLeftFar,downRightFar,downLeftFar);
+    
+    % Нахождения конъюнкции многоугольников на высоте ограничения и на полу
+    conjunction = planesConjunction(planeInterLimit,planeInterFloor);
 
     f = figure;
     nColor = 'red';
     mColor = 'yellow';
     fColor = 'green';
+    conColor = 'black';
 
     % Если рёбра frustum пересекают плоскость пола, то строим пересечение на
     % графике
@@ -63,6 +79,27 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleCl
         hold on
     else
         interFar = fill3(planeInterFar(:,1),planeInterFar(:,2),planeInterFar(:,3),fColor);
+        hold on
+    end
+    
+    % Если рёбра полного frustum пересекают плоскость ограничения по
+    % высоте, то строим пересечение на графике
+    [mHeight, ~] = size(planeInterLimit);
+    if (mHeight < 3)
+        interHeight = fill3([0 0 0], [0 0 0], [0 0 0], conColor);
+        hold on
+    else
+        interHeight = fill3(planeInterLimit(:,1),planeInterLimit(:,2),planeInterLimit(:,3),conColor);
+        hold on
+    end
+    
+    % Если конъюнкция плоскостей - многоугольник, то строим её на графике
+    [mCon, ~] = size(conjunction);
+    if (mCon < 3)
+        interCon = fill3([0 0 0], [0 0 0], [0 0 0], conColor);
+        hold on
+    else
+        interCon = fill3(conjunction(:,1),conjunction(:,2),conjunction(:,3),conColor);
         hold on
     end
 
@@ -180,24 +217,35 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleCl
                   'Value', fovV, 'String', fovV, 'Callback', {@update3DPointS});
     uicontrol('Parent',f,'Style','text','Position',[81*3+distH,25+distV,50,23],...
                     'String','FOV Vertical','BackgroundColor',bgcolor);
+
+    bHeightLimit = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*3+distH,54+distV*2,50,23],...
+                  'Value', heightLimit, 'String', heightLimit, 'Callback', {@update3DPointS});
+    uicontrol('Parent',f,'Style','text','Position',[81*3+distH,25+distV*2,50,23],...
+                    'String','Height Limit','BackgroundColor',bgcolor);
                 
-    bFrustumNear = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54,110,23],...
+    bFrustumNear = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54,130,23],...
                    'Value', 1, 'String', 'Near Frustum', 'Callback', {@update3DPointS});
                
-    bFrustumMid = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV/2,110,23],...
+    bFrustumMid = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV/2,130,23],...
                    'Value', 1, 'String', 'Middle Frustum', 'Callback', {@update3DPointS});
 
-    bFrustumFar = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV,110,23],...
+    bFrustumFar = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV,130,23],...
                    'Value', 1, 'String', 'Far Frustum', 'Callback', {@update3DPointS});
     
-    bInterNear = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+141,54,110,23],...
+    bInterNear = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+171,54,130,23],...
                    'Value', 1, 'String', 'Near Intersection', 'Callback', {@update3DPointS});
                
-    bInterMid = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+141,54+distV/2,110,23],...
+    bInterMid = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+171,54+distV/2,130,23],...
                    'Value', 1, 'String', 'Middle Intersection', 'Callback', {@update3DPointS});
 
-    bInterFar = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+141,54+distV,110,23],...
+    bInterFar = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+171,54+distV,130,23],...
                    'Value', 1, 'String', 'Far Intersection', 'Callback', {@update3DPointS});
+    
+    bInterHeight = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+171*2,54,130,23],...
+                   'Value', 1, 'String', 'Height Intersection', 'Callback', {@update3DPointS});
+               
+    bInterCon = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+171*2,54+distV/2,130,23],...
+                   'Value', 1, 'String', 'Conjunction Intersection', 'Callback', {@update3DPointS});
     
     function update3DPointS(~,~)
         pan = get(bPan,'Value');
@@ -211,12 +259,15 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleCl
         farClipPlane = str2double(get(bFarClipPlane,'String'));
         fovH = str2double(get(bFovH,'String'));
         fovV = str2double(get(bFovV,'String'));
+        heightLimit = str2double(get(bHeightLimit,'String'));
         nearFrustumCheck = get(bFrustumNear,'Value');
         midFrustumCheck = get(bFrustumMid,'Value');
         farFrustumCheck = get(bFrustumFar,'Value');
         nearInterCheck = get(bInterNear,'Value');
         midInterCheck = get(bInterMid,'Value');
         farInterCheck = get(bInterFar,'Value');
+        heightInterCheck = get(bInterHeight,'Value');
+        conInterCheck = get(bInterCon,'Value');
         
         camPos = [camPosX camPosY camPosZ];
 
@@ -245,6 +296,20 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleCl
             upRightMid,upLeftMid,downRightMid,downLeftMid);
         planeInterFar = planeTruncFrustumIntersect(X,V0,upRightMid,upLeftMid,downRightMid,downLeftMid,...
             upRightFar,upLeftFar,downRightFar,downLeftFar);
+        
+        % Определение плоскости ограничения по высоте
+        V1 = [0 1 heightLimit];                 % Любая точка на плоскости пола
+        X1 = [0 0 heightLimit + 1];             % Вектор нормали плоскости
+        
+        % Нахождение точек пересечения полного frustum с плоскостью ограничения
+        % по высоте
+        planeInterLimit = planeFrustumIntersect(X1,V1,camPos,upRightFar,upLeftFar,downRightFar,downLeftFar);
+
+        % Нахождение точек пересечения полного frustum с плоскостью пола
+        planeInterFloor = planeFrustumIntersect(X,V0,camPos,upRightFar,upLeftFar,downRightFar,downLeftFar);
+
+        % Нахождения конъюнкции многоугольников на высоте ограничения и на полу
+        conjunction = planesConjunction(planeInterLimit,planeInterFloor);
 
         % Если рёбра frustum пересекают плоскость пола, то строим пересечение на
         % графике
@@ -282,6 +347,33 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,middleCl
             end
         else
             set(interFar, 'visible', 'off');
+        end
+        
+        % Если рёбра полного frustum пересекают плоскость ограничения по
+        % высоте, то строим пересечение на графике
+        if heightInterCheck == 1
+            set(interHeight, 'visible', 'on');
+            [mHeight, ~] = size(planeInterLimit);
+            if (mHeight < 3)
+                set(interHeight, 'XData', [0 0 0], 'YData', [0 0 0], 'ZData', [0 0 0]);
+            else
+                set(interHeight, 'XData', planeInterLimit(:,1), 'YData', planeInterLimit(:,2), 'ZData', planeInterLimit(:,3));
+            end
+        else
+            set(interHeight, 'visible', 'off');
+        end
+
+        % Если конъюнкция плоскостей - многоугольник, то строим её на графике
+        if conInterCheck == 1
+            set(interCon, 'visible', 'on');
+            [mCon, ~] = size(conjunction);
+            if (mCon < 3)
+                set(interCon, 'XData', [0 0 0], 'YData', [0 0 0], 'ZData', [0 0 0]);
+            else
+                set(interCon, 'XData', conjunction(:,1), 'YData', conjunction(:,2), 'ZData', conjunction(:,3));
+            end
+        else
+            set(interCon, 'visible', 'off');
         end
 
         % Переопределение построенных frustum`ов

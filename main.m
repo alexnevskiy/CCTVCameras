@@ -4,7 +4,7 @@ W = 1920;               % Ширина изображения
 H = 1080;               % Высота изображения
 % flen = 3.6 * 10^(-3);   % Фокусное расстояние (раздел "Объектив")
 pan = 0;                % Угол поворота вокруг оси Z
-tilt = 75;              % Угол поворота вокруг оси X
+tilt = 50;              % Угол поворота вокруг оси X
 roll = 0;               % Угол поворота вокруг оси Y
 fovH = 93;              % Угол обзора по горизонтали
 fovV = 51;              % Угол обзора по вертикали
@@ -13,6 +13,7 @@ middleClipPlane = 50;   % Расстояние от камеры до средн
 farClipPlane = 80;      % Расстояние от камеры до дальней плоскости отсечения по оси Z
 camPos = [0 -30 5];     % Позиция камеры относительно мировых координат
 length = 150;           % Длина стороны плоскости пола
+heightLimit = 2;        % Ограничение по высоте
 
 plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,...
-    middleClipPlane,farClipPlane,camPos,length)
+    middleClipPlane,farClipPlane,camPos,length,heightLimit)

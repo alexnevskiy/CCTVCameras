@@ -43,5 +43,6 @@ function inter = planeFrustumIntersect(X,V0,camPos,upRight,upLeft,downRight,down
         [~,~,V] = svd(P,0);
         [~,is] = sort(atan2(P*V(:,1),P*V(:,2)));
         inter = inter(is([1:end 1]),:);
+        inter(end,:) = [];
     end
 end
