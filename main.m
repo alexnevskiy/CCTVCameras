@@ -11,9 +11,10 @@ fovV = 51;              % Угол обзора по вертикали
 nearClipPlane = 30;     % Расстояние от камеры до ближайшей плоскости отсечения по оси Z
 middleClipPlane = 50;   % Расстояние от камеры до средней плоскости отсечения по оси Z
 farClipPlane = 80;      % Расстояние от камеры до дальней плоскости отсечения по оси Z
-camPos = [0 -30 5];     % Позиция камеры относительно мировых координат
+camPos = [0 -30 15];    % Позиция камеры относительно мировых координат
 length = 150;           % Длина стороны плоскости пола
 heightLimit = 2;        % Ограничение по высоте
+numberOfObjects = 2;    % Количество объектов (максимум 5)
 
 plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,...
-    middleClipPlane,farClipPlane,camPos,length,heightLimit)
+    middleClipPlane,farClipPlane,camPos,length,heightLimit,numberOfObjects)

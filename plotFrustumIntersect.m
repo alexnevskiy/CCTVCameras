@@ -1,5 +1,5 @@
 function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
-    nearClipPlane,middleClipPlane,farClipPlane,camPos,length,heightLimit)
+    nearClipPlane,middleClipPlane,farClipPlane,camPos,length,heightLimit,numberOfObjects)
     % aspect = W / H;         % Соотношение сторон камеры
     
     fovHTan = tan(fovH / 2 / 180 * pi);
@@ -44,41 +44,67 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     % Нахождение точек пересечения полного frustum с плоскостью пола
     planeInterFloor = planeFrustumIntersect(X,V0,camPos,upRightFar,upLeftFar,downRightFar,downLeftFar);
     
-    % Нахождения конъюнкции многоугольников на высоте ограничения и на полу
+    % Нахождение конъюнкции многоугольников на высоте ограничения и на полу
     conjunction = planesConjunction(planeInterLimit,planeInterFloor);
+    
+    % Создание объектов и нахождение слепых зон
+    interNearPoly = polyshape(planeInterNear(:,1:2));
+    interMidPoly = polyshape(planeInterMid(:,1:2));
+    interFarPoly = polyshape(planeInterFar(:,1:2));
+    
+    maxNumberOfObjects = 5;
+    parallelepipeds = cell(maxNumberOfObjects,1);
+    
+    floorPoly = polyshape(planeInterFloor(:,1:2));
 
+    for i = 1:maxNumberOfObjects
+        parallelepipeds{i,1} = getParallelepiped(i,i,i*2,[i*2 i*2 0]);
+        if ((i <= numberOfObjects) && (~isBehind(parallelepipeds{i,1},T,camPos)))
+            TRPlane = planeProjection(parallelepipeds{i,1},X,V0,T,camPos,upRightFar,upLeftFar);
+            unPoly = unionPolygons(TRPlane);
+            floorPoly = subtract(floorPoly,unPoly);
+        end
+    end
+
+    if ((numberOfObjects > 0) && (numberOfObjects <= maxNumberOfObjects))
+        interNearPoly = intersect(interNearPoly,floorPoly);
+        interMidPoly = intersect(interMidPoly,floorPoly);
+        interFarPoly = intersect(interFarPoly,floorPoly);
+    end
+    
     f = figure;
     nColor = 'red';
     mColor = 'yellow';
     fColor = 'green';
     conColor = 'black';
+    paralColor = 'blue';
 
     % Если рёбра frustum пересекают плоскость пола, то строим пересечение на
-    % графике
-    [mNear, ~] = size(planeInterNear);
+    % графике (вместе со слепыми зонами)
+    [mNear, ~] = size(interNearPoly.Vertices);
     if (mNear < 3)
-        interNear = fill3([0 0 0], [0 0 0], [0 0 0], nColor);
+        interNear = plot(polyshape([0 0 0 0], [0 0 0 0]),'FaceColor',nColor);
         hold on
     else
-        interNear = fill3(planeInterNear(:,1),planeInterNear(:,2),planeInterNear(:,3),nColor);
+        interNear = plot(interNearPoly,'FaceColor',nColor);
         hold on
     end
     
-    [mMid, ~] = size(planeInterMid);
+    [mMid, ~] = size(interMidPoly.Vertices);
     if (mMid < 3)
-        interMid = fill3([0 0 0], [0 0 0], [0 0 0], mColor);
+        interMid = plot(polyshape([0 0 0 0], [0 0 0 0]),'FaceColor',mColor);
         hold on
     else
-        interMid = fill3(planeInterMid(:,1),planeInterMid(:,2),planeInterMid(:,3),mColor);
+        interMid = plot(interMidPoly,'FaceColor',mColor);
         hold on
     end
 
-    [mFar, ~] = size(planeInterFar);
+    [mFar, ~] = size(interFarPoly.Vertices);
     if (mFar < 3)
-        interFar = fill3([0 0 0], [0 0 0], [0 0 0], fColor);
+        interFar = plot(polyshape([0 0 0 0], [0 0 0 0]),'FaceColor',fColor);
         hold on
     else
-        interFar = fill3(planeInterFar(:,1),planeInterFar(:,2),planeInterFar(:,3),fColor);
+        interFar = plot(interFarPoly,'FaceColor',fColor);
         hold on
     end
     
@@ -101,6 +127,17 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     else
         interCon = fill3(conjunction(:,1),conjunction(:,2),conjunction(:,3),conColor);
         hold on
+    end
+    
+    % Построение объектов (препятствий) на графике
+    paralSurf = cell(maxNumberOfObjects,1);
+    
+    for i = 1:maxNumberOfObjects
+        paralSurf{i,1} = trisurf(parallelepipeds{i,1},'FaceColor',paralColor);
+        hold on;
+        if i > numberOfObjects
+            paralSurf{i,1}.Visible = 'off';
+        end
     end
 
     % Построение frustum`ов
@@ -145,6 +182,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     grid on
     axis equal
     axis manual
+    view(3);
     
     distV = 75;
     distH = 450;
@@ -223,29 +261,392 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     uicontrol('Parent',f,'Style','text','Position',[81*3+distH,25+distV*2,50,23],...
                     'String','Height Limit','BackgroundColor',bgcolor);
                 
-    bFrustumNear = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54,130,23],...
+    bFrustumNear = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54-distV/2,130,23],...
                    'Value', 1, 'String', 'Near Frustum', 'Callback', {@update3DPointS});
                
-    bFrustumMid = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV/2,130,23],...
+    bFrustumMid = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54,130,23],...
                    'Value', 1, 'String', 'Middle Frustum', 'Callback', {@update3DPointS});
 
-    bFrustumFar = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV,130,23],...
+    bFrustumFar = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV/2,130,23],...
                    'Value', 1, 'String', 'Far Frustum', 'Callback', {@update3DPointS});
     
-    bInterNear = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+171,54,130,23],...
+    bInterNear = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV,130,23],...
                    'Value', 1, 'String', 'Near Intersection', 'Callback', {@update3DPointS});
                
-    bInterMid = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+171,54+distV/2,130,23],...
+    bInterMid = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV*3/2,130,23],...
                    'Value', 1, 'String', 'Middle Intersection', 'Callback', {@update3DPointS});
 
-    bInterFar = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+171,54+distV,130,23],...
+    bInterFar = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV*2,130,23],...
                    'Value', 1, 'String', 'Far Intersection', 'Callback', {@update3DPointS});
     
-    bInterHeight = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+171*2,54,130,23],...
+    bInterHeight = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+161,54-distV/2,130,23],...
                    'Value', 1, 'String', 'Height Intersection', 'Callback', {@update3DPointS});
                
-    bInterCon = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+171*2,54+distV/2,130,23],...
+    bInterCon = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+161,54,130,23],...
                    'Value', 1, 'String', 'Conjunction Intersection', 'Callback', {@update3DPointS});
+    
+    bNumberOfObjects = uicontrol('Parent', f, 'Style', 'popupmenu', 'Position', [81*4+distH+251,54+distV*3/2,50,23],...
+                   'Value', numberOfObjects + 1, 'String', {'0','1','2','3','4','5'}, 'Callback', {@update3DPointS});
+    uicontrol('Parent',f,'Style','text','Position',[81*4+distH+161,54+distV*3/2,85,23],...
+                    'String','Number of objects','BackgroundColor',bgcolor);
+                
+    bObjectX1 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*4+distH+161*2,54,50,23],...
+                  'Value', parallelepipeds{1,1}.Points(7,1), 'String', parallelepipeds{1,1}.Points(7,1), 'Callback', {@update3DPointS});
+    bObjectX1T = uicontrol('Parent',f,'Style','text','Position',[81*4+distH+161*2,25,50,23],...
+                    'String','1 Object X','BackgroundColor',bgcolor);
+
+    bObjectY1 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*4+distH+161*2,54+distV,50,23],...
+                  'Value', parallelepipeds{1,1}.Points(7,2), 'String', parallelepipeds{1,1}.Points(7,2), 'Callback', {@update3DPointS});
+    bObjectY1T = uicontrol('Parent',f,'Style','text','Position',[81*4+distH+161*2,25+distV,50,23],...
+                    'String','1 Object Y','BackgroundColor',bgcolor);
+    
+    bObjectZ1 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*4+distH+161*2,54+distV*2,50,23],...
+                  'Value', parallelepipeds{1,1}.Points(7,3), 'String', parallelepipeds{1,1}.Points(7,3), 'Callback', {@update3DPointS});
+    bObjectZ1T = uicontrol('Parent',f,'Style','text','Position',[81*4+distH+161*2,25+distV*2,50,23],...
+                    'String','1 Object Z','BackgroundColor',bgcolor);
+    
+    bObjectWidth1 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*5+distH+161*2,54,50,23],...
+                  'Value', parallelepipeds{1,1}.Points(4,1) - parallelepipeds{1,1}.Points(7,1),...
+                  'String', parallelepipeds{1,1}.Points(4,1) - parallelepipeds{1,1}.Points(7,1), 'Callback', {@update3DPointS});
+    bObjectWidth1T = uicontrol('Parent',f,'Style','text','Position',[81*5+distH+161*2,25,50,25],...
+                    'String','1 Object Width','BackgroundColor',bgcolor);
+
+    bObjectDepth1 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*5+distH+161*2,54+distV,50,23],...
+                  'Value', parallelepipeds{1,1}.Points(4,2) - parallelepipeds{1,1}.Points(7,2),...
+                  'String', parallelepipeds{1,1}.Points(4,2) - parallelepipeds{1,1}.Points(7,2), 'Callback', {@update3DPointS});
+    bObjectDepth1T = uicontrol('Parent',f,'Style','text','Position',[81*5+distH+161*2,25+distV,50,25],...
+                    'String','1 Object Depth','BackgroundColor',bgcolor);
+    
+    bObjectHeight1 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*5+distH+161*2,54+distV*2,50,23],...
+                  'Value', parallelepipeds{1,1}.Points(4,3) - parallelepipeds{1,1}.Points(7,3),...
+                  'String', parallelepipeds{1,1}.Points(4,3) - parallelepipeds{1,1}.Points(7,3), 'Callback', {@update3DPointS});
+    bObjectHeight1T = uicontrol('Parent',f,'Style','text','Position',[81*5+distH+161*2,25+distV*2,50,25],...
+                    'String','1 Object Height','BackgroundColor',bgcolor);
+    
+    bObjectX2 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*6+distH+161*2,54,50,23],...
+                  'Value', parallelepipeds{2,1}.Points(7,1), 'String', parallelepipeds{2,1}.Points(7,1), 'Callback', {@update3DPointS});
+    bObjectX2T = uicontrol('Parent',f,'Style','text','Position',[81*6+distH+161*2,25,50,23],...
+                    'String','2 Object X','BackgroundColor',bgcolor);
+
+    bObjectY2 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*6+distH+161*2,54+distV,50,23],...
+                  'Value', parallelepipeds{2,1}.Points(7,2), 'String', parallelepipeds{2,1}.Points(7,2), 'Callback', {@update3DPointS});
+    bObjectY2T = uicontrol('Parent',f,'Style','text','Position',[81*6+distH+161*2,25+distV,50,23],...
+                    'String','2 Object Y','BackgroundColor',bgcolor);
+    
+    bObjectZ2 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*6+distH+161*2,54+distV*2,50,23],...
+                  'Value', parallelepipeds{2,1}.Points(7,3), 'String', parallelepipeds{2,1}.Points(7,3), 'Callback', {@update3DPointS});
+    bObjectZ2T = uicontrol('Parent',f,'Style','text','Position',[81*6+distH+161*2,25+distV*2,50,23],...
+                    'String','2 Object Z','BackgroundColor',bgcolor);
+    
+    bObjectWidth2 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*7+distH+161*2,54,50,23],...
+                  'Value', parallelepipeds{2,1}.Points(4,1) - parallelepipeds{2,1}.Points(7,1),...
+                  'String', parallelepipeds{2,1}.Points(4,1) - parallelepipeds{2,1}.Points(7,1), 'Callback', {@update3DPointS});
+    bObjectWidth2T = uicontrol('Parent',f,'Style','text','Position',[81*7+distH+161*2,25,50,25],...
+                    'String','2 Object Width','BackgroundColor',bgcolor);
+
+    bObjectDepth2 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*7+distH+161*2,54+distV,50,23],...
+                  'Value', parallelepipeds{2,1}.Points(4,2) - parallelepipeds{2,1}.Points(7,2),...
+                  'String', parallelepipeds{2,1}.Points(4,2) - parallelepipeds{2,1}.Points(7,2), 'Callback', {@update3DPointS});
+    bObjectDepth2T = uicontrol('Parent',f,'Style','text','Position',[81*7+distH+161*2,25+distV,50,25],...
+                    'String','2 Object Depth','BackgroundColor',bgcolor);
+    
+    bObjectHeight2 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*7+distH+161*2,54+distV*2,50,23],...
+                  'Value', parallelepipeds{2,1}.Points(4,3) - parallelepipeds{2,1}.Points(7,3),...
+                  'String', parallelepipeds{2,1}.Points(4,3) - parallelepipeds{2,1}.Points(7,3), 'Callback', {@update3DPointS});
+    bObjectHeight2T = uicontrol('Parent',f,'Style','text','Position',[81*7+distH+161*2,25+distV*2,50,25],...
+                    'String','2 Object Height','BackgroundColor',bgcolor);
+    
+    bObjectX3 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*8+distH+161*2,54,50,23],...
+                  'Value', parallelepipeds{3,1}.Points(7,1), 'String', parallelepipeds{3,1}.Points(7,1), 'Callback', {@update3DPointS});
+    bObjectX3T = uicontrol('Parent',f,'Style','text','Position',[81*8+distH+161*2,25,50,23],...
+                    'String','3 Object X','BackgroundColor',bgcolor);
+
+    bObjectY3 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*8+distH+161*2,54+distV,50,23],...
+                  'Value', parallelepipeds{3,1}.Points(7,2), 'String', parallelepipeds{3,1}.Points(7,2), 'Callback', {@update3DPointS});
+    bObjectY3T = uicontrol('Parent',f,'Style','text','Position',[81*8+distH+161*2,25+distV,50,23],...
+                    'String','3 Object Y','BackgroundColor',bgcolor);
+    
+    bObjectZ3 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*8+distH+161*2,54+distV*2,50,23],...
+                  'Value', parallelepipeds{3,1}.Points(7,3), 'String', parallelepipeds{3,1}.Points(7,3), 'Callback', {@update3DPointS});
+    bObjectZ3T = uicontrol('Parent',f,'Style','text','Position',[81*8+distH+161*2,25+distV*2,50,23],...
+                    'String','3 Object Z','BackgroundColor',bgcolor);
+    
+    bObjectWidth3 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*9+distH+161*2,54,50,23],...
+                  'Value', parallelepipeds{3,1}.Points(4,1) - parallelepipeds{3,1}.Points(7,1),...
+                  'String', parallelepipeds{3,1}.Points(4,1) - parallelepipeds{3,1}.Points(7,1), 'Callback', {@update3DPointS});
+    bObjectWidth3T = uicontrol('Parent',f,'Style','text','Position',[81*9+distH+161*2,25,50,25],...
+                    'String','3 Object Width','BackgroundColor',bgcolor);
+
+    bObjectDepth3 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*9+distH+161*2,54+distV,50,23],...
+                  'Value', parallelepipeds{3,1}.Points(4,2) - parallelepipeds{3,1}.Points(7,2),...
+                  'String', parallelepipeds{3,1}.Points(4,2) - parallelepipeds{3,1}.Points(7,2), 'Callback', {@update3DPointS});
+    bObjectDepth3T = uicontrol('Parent',f,'Style','text','Position',[81*9+distH+161*2,25+distV,50,25],...
+                    'String','3 Object Depth','BackgroundColor',bgcolor);
+    
+    bObjectHeight3 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*9+distH+161*2,54+distV*2,50,23],...
+                  'Value', parallelepipeds{3,1}.Points(4,3) - parallelepipeds{3,1}.Points(7,3),...
+                  'String', parallelepipeds{3,1}.Points(4,3) - parallelepipeds{3,1}.Points(7,3), 'Callback', {@update3DPointS});
+    bObjectHeight3T = uicontrol('Parent',f,'Style','text','Position',[81*9+distH+161*2,25+distV*2,50,25],...
+                    'String','3 Object Height','BackgroundColor',bgcolor);
+    
+    bObjectX4 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*10+distH+161*2,54,50,23],...
+                  'Value', parallelepipeds{4,1}.Points(7,1), 'String', parallelepipeds{4,1}.Points(7,1), 'Callback', {@update3DPointS});
+    bObjectX4T = uicontrol('Parent',f,'Style','text','Position',[81*10+distH+161*2,25,50,23],...
+                    'String','4 Object X','BackgroundColor',bgcolor);
+
+    bObjectY4 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*10+distH+161*2,54+distV,50,23],...
+                  'Value', parallelepipeds{4,1}.Points(7,2), 'String', parallelepipeds{4,1}.Points(7,2), 'Callback', {@update3DPointS});
+    bObjectY4T = uicontrol('Parent',f,'Style','text','Position',[81*10+distH+161*2,25+distV,50,23],...
+                    'String','4 Object Y','BackgroundColor',bgcolor);
+    
+    bObjectZ4 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*10+distH+161*2,54+distV*2,50,23],...
+                  'Value', parallelepipeds{4,1}.Points(7,3), 'String', parallelepipeds{4,1}.Points(7,3), 'Callback', {@update3DPointS});
+    bObjectZ4T = uicontrol('Parent',f,'Style','text','Position',[81*10+distH+161*2,25+distV*2,50,23],...
+                    'String','4 Object Z','BackgroundColor',bgcolor);
+    
+    bObjectWidth4 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*11+distH+161*2,54,50,23],...
+                  'Value', parallelepipeds{4,1}.Points(4,1) - parallelepipeds{4,1}.Points(7,1),...
+                  'String', parallelepipeds{4,1}.Points(4,1) - parallelepipeds{4,1}.Points(7,1), 'Callback', {@update3DPointS});
+    bObjectWidth4T = uicontrol('Parent',f,'Style','text','Position',[81*11+distH+161*2,25,50,25],...
+                    'String','4 Object Width','BackgroundColor',bgcolor);
+
+    bObjectDepth4 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*11+distH+161*2,54+distV,50,23],...
+                  'Value', parallelepipeds{4,1}.Points(4,2) - parallelepipeds{4,1}.Points(7,2),...
+                  'String', parallelepipeds{4,1}.Points(4,2) - parallelepipeds{4,1}.Points(7,2), 'Callback', {@update3DPointS});
+    bObjectDepth4T = uicontrol('Parent',f,'Style','text','Position',[81*11+distH+161*2,25+distV,50,25],...
+                    'String','4 Object Depth','BackgroundColor',bgcolor);
+    
+    bObjectHeight4 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*11+distH+161*2,54+distV*2,50,23],...
+                  'Value', parallelepipeds{4,1}.Points(4,3) - parallelepipeds{4,1}.Points(7,3),...
+                  'String', parallelepipeds{4,1}.Points(4,3) - parallelepipeds{4,1}.Points(7,3), 'Callback', {@update3DPointS});
+    bObjectHeight4T = uicontrol('Parent',f,'Style','text','Position',[81*11+distH+161*2,25+distV*2,50,25],...
+                    'String','4 Object Height','BackgroundColor',bgcolor);
+    
+    bObjectX5 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*12+distH+161*2,54,50,23],...
+                  'Value', parallelepipeds{5,1}.Points(7,1), 'String', parallelepipeds{5,1}.Points(7,1), 'Callback', {@update3DPointS});
+    bObjectX5T = uicontrol('Parent',f,'Style','text','Position',[81*12+distH+161*2,25,50,23],...
+                    'String','5 Object X','BackgroundColor',bgcolor);
+
+    bObjectY5 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*12+distH+161*2,54+distV,50,23],...
+                  'Value', parallelepipeds{5,1}.Points(7,2), 'String', parallelepipeds{5,1}.Points(7,2), 'Callback', {@update3DPointS});
+    bObjectY5T = uicontrol('Parent',f,'Style','text','Position',[81*12+distH+161*2,25+distV,50,23],...
+                    'String','5 Object Y','BackgroundColor',bgcolor);
+    
+    bObjectZ5 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*12+distH+161*2,54+distV*2,50,23],...
+                  'Value', parallelepipeds{5,1}.Points(7,3), 'String', parallelepipeds{5,1}.Points(7,3), 'Callback', {@update3DPointS});
+    bObjectZ5T = uicontrol('Parent',f,'Style','text','Position',[81*12+distH+161*2,25+distV*2,50,23],...
+                    'String','5 Object Z','BackgroundColor',bgcolor);
+    
+    bObjectWidth5 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*13+distH+161*2,54,50,23],...
+                  'Value', parallelepipeds{5,1}.Points(4,1) - parallelepipeds{5,1}.Points(7,1),...
+                  'String', parallelepipeds{5,1}.Points(4,1) - parallelepipeds{5,1}.Points(7,1), 'Callback', {@update3DPointS});
+    bObjectWidth5T = uicontrol('Parent',f,'Style','text','Position',[81*13+distH+161*2,25,50,25],...
+                    'String','5 Object Width','BackgroundColor',bgcolor);
+
+    bObjectDepth5 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*13+distH+161*2,54+distV,50,23],...
+                  'Value', parallelepipeds{5,1}.Points(4,2) - parallelepipeds{5,1}.Points(7,2),...
+                  'String', parallelepipeds{5,1}.Points(4,2) - parallelepipeds{5,1}.Points(7,2), 'Callback', {@update3DPointS});
+    bObjectDepth5T = uicontrol('Parent',f,'Style','text','Position',[81*13+distH+161*2,25+distV,50,25],...
+                    'String','5 Object Depth','BackgroundColor',bgcolor);
+    
+    bObjectHeight5 = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*13+distH+161*2,54+distV*2,50,23],...
+                  'Value', parallelepipeds{5,1}.Points(4,3) - parallelepipeds{5,1}.Points(7,3),...
+                  'String', parallelepipeds{5,1}.Points(4,3) - parallelepipeds{5,1}.Points(7,3), 'Callback', {@update3DPointS});
+    bObjectHeight5T = uicontrol('Parent',f,'Style','text','Position',[81*13+distH+161*2,25+distV*2,50,25],...
+                    'String','5 Object Height','BackgroundColor',bgcolor);
+                
+    switch numberOfObjects
+        case 0
+            set(bObjectX1,'Visible','off');
+            set(bObjectY1,'Visible','off');
+            set(bObjectZ1,'Visible','off');
+            set(bObjectWidth1,'Visible','off');
+            set(bObjectDepth1,'Visible','off');
+            set(bObjectHeight1,'Visible','off');
+            set(bObjectX2,'Visible','off');
+            set(bObjectY2,'Visible','off');
+            set(bObjectZ2,'Visible','off');
+            set(bObjectWidth2,'Visible','off');
+            set(bObjectDepth2,'Visible','off');
+            set(bObjectHeight2,'Visible','off');
+            set(bObjectX3,'Visible','off');
+            set(bObjectY3,'Visible','off');
+            set(bObjectZ3,'Visible','off');
+            set(bObjectWidth3,'Visible','off');
+            set(bObjectDepth3,'Visible','off');
+            set(bObjectHeight3,'Visible','off');
+            set(bObjectX4,'Visible','off');
+            set(bObjectY4,'Visible','off');
+            set(bObjectZ4,'Visible','off');
+            set(bObjectWidth4,'Visible','off');
+            set(bObjectDepth4,'Visible','off');
+            set(bObjectHeight4,'Visible','off');
+            set(bObjectX5,'Visible','off');
+            set(bObjectY5,'Visible','off');
+            set(bObjectZ5,'Visible','off');
+            set(bObjectWidth5,'Visible','off');
+            set(bObjectDepth5,'Visible','off');
+            set(bObjectHeight5,'Visible','off');
+            
+            set(bObjectX1T,'Visible','off');
+            set(bObjectY1T,'Visible','off');
+            set(bObjectZ1T,'Visible','off');
+            set(bObjectWidth1T,'Visible','off');
+            set(bObjectDepth1T,'Visible','off');
+            set(bObjectHeight1T,'Visible','off');
+            set(bObjectX2T,'Visible','off');
+            set(bObjectY2T,'Visible','off');
+            set(bObjectZ2T,'Visible','off');
+            set(bObjectWidth2T,'Visible','off');
+            set(bObjectDepth2T,'Visible','off');
+            set(bObjectHeight2T,'Visible','off');
+            set(bObjectX3T,'Visible','off');
+            set(bObjectY3T,'Visible','off');
+            set(bObjectZ3T,'Visible','off');
+            set(bObjectWidth3T,'Visible','off');
+            set(bObjectDepth3T,'Visible','off');
+            set(bObjectHeight3T,'Visible','off');
+            set(bObjectX4T,'Visible','off');
+            set(bObjectY4T,'Visible','off');
+            set(bObjectZ4T,'Visible','off');
+            set(bObjectWidth4T,'Visible','off');
+            set(bObjectDepth4T,'Visible','off');
+            set(bObjectHeight4T,'Visible','off');
+            set(bObjectX5T,'Visible','off');
+            set(bObjectY5T,'Visible','off');
+            set(bObjectZ5T,'Visible','off');
+            set(bObjectWidth5T,'Visible','off');
+            set(bObjectDepth5T,'Visible','off');
+            set(bObjectHeight5T,'Visible','off');
+        case 1
+            set(bObjectX2,'Visible','off');
+            set(bObjectY2,'Visible','off');
+            set(bObjectZ2,'Visible','off');
+            set(bObjectWidth2,'Visible','off');
+            set(bObjectDepth2,'Visible','off');
+            set(bObjectHeight2,'Visible','off');
+            set(bObjectX3,'Visible','off');
+            set(bObjectY3,'Visible','off');
+            set(bObjectZ3,'Visible','off');
+            set(bObjectWidth3,'Visible','off');
+            set(bObjectDepth3,'Visible','off');
+            set(bObjectHeight3,'Visible','off');
+            set(bObjectX4,'Visible','off');
+            set(bObjectY4,'Visible','off');
+            set(bObjectZ4,'Visible','off');
+            set(bObjectWidth4,'Visible','off');
+            set(bObjectDepth4,'Visible','off');
+            set(bObjectHeight4,'Visible','off');
+            set(bObjectX5,'Visible','off');
+            set(bObjectY5,'Visible','off');
+            set(bObjectZ5,'Visible','off');
+            set(bObjectWidth5,'Visible','off');
+            set(bObjectDepth5,'Visible','off');
+            set(bObjectHeight5,'Visible','off');
+            
+            set(bObjectX2T,'Visible','off');
+            set(bObjectY2T,'Visible','off');
+            set(bObjectZ2T,'Visible','off');
+            set(bObjectWidth2T,'Visible','off');
+            set(bObjectDepth2T,'Visible','off');
+            set(bObjectHeight2T,'Visible','off');
+            set(bObjectX3T,'Visible','off');
+            set(bObjectY3T,'Visible','off');
+            set(bObjectZ3T,'Visible','off');
+            set(bObjectWidth3T,'Visible','off');
+            set(bObjectDepth3T,'Visible','off');
+            set(bObjectHeight3T,'Visible','off');
+            set(bObjectX4T,'Visible','off');
+            set(bObjectY4T,'Visible','off');
+            set(bObjectZ4T,'Visible','off');
+            set(bObjectWidth4T,'Visible','off');
+            set(bObjectDepth4T,'Visible','off');
+            set(bObjectHeight4T,'Visible','off');
+            set(bObjectX5T,'Visible','off');
+            set(bObjectY5T,'Visible','off');
+            set(bObjectZ5T,'Visible','off');
+            set(bObjectWidth5T,'Visible','off');
+            set(bObjectDepth5T,'Visible','off');
+            set(bObjectHeight5T,'Visible','off');
+        case 2
+            set(bObjectX3,'Visible','off');
+            set(bObjectY3,'Visible','off');
+            set(bObjectZ3,'Visible','off');
+            set(bObjectWidth3,'Visible','off');
+            set(bObjectDepth3,'Visible','off');
+            set(bObjectHeight3,'Visible','off');
+            set(bObjectX4,'Visible','off');
+            set(bObjectY4,'Visible','off');
+            set(bObjectZ4,'Visible','off');
+            set(bObjectWidth4,'Visible','off');
+            set(bObjectDepth4,'Visible','off');
+            set(bObjectHeight4,'Visible','off');
+            set(bObjectX5,'Visible','off');
+            set(bObjectY5,'Visible','off');
+            set(bObjectZ5,'Visible','off');
+            set(bObjectWidth5,'Visible','off');
+            set(bObjectDepth5,'Visible','off');
+            set(bObjectHeight5,'Visible','off');
+            
+            set(bObjectX3T,'Visible','off');
+            set(bObjectY3T,'Visible','off');
+            set(bObjectZ3T,'Visible','off');
+            set(bObjectWidth3T,'Visible','off');
+            set(bObjectDepth3T,'Visible','off');
+            set(bObjectHeight3T,'Visible','off');
+            set(bObjectX4T,'Visible','off');
+            set(bObjectY4T,'Visible','off');
+            set(bObjectZ4T,'Visible','off');
+            set(bObjectWidth4T,'Visible','off');
+            set(bObjectDepth4T,'Visible','off');
+            set(bObjectHeight4T,'Visible','off');
+            set(bObjectX5T,'Visible','off');
+            set(bObjectY5T,'Visible','off');
+            set(bObjectZ5T,'Visible','off');
+            set(bObjectWidth5T,'Visible','off');
+            set(bObjectDepth5T,'Visible','off');
+            set(bObjectHeight5T,'Visible','off');
+        case 3
+            set(bObjectX4,'Visible','off');
+            set(bObjectY4,'Visible','off');
+            set(bObjectZ4,'Visible','off');
+            set(bObjectWidth4,'Visible','off');
+            set(bObjectDepth4,'Visible','off');
+            set(bObjectHeight4,'Visible','off');
+            set(bObjectX5,'Visible','off');
+            set(bObjectY5,'Visible','off');
+            set(bObjectZ5,'Visible','off');
+            set(bObjectWidth5,'Visible','off');
+            set(bObjectDepth5,'Visible','off');
+            set(bObjectHeight5,'Visible','off');
+            
+            set(bObjectX4T,'Visible','off');
+            set(bObjectY4T,'Visible','off');
+            set(bObjectZ4T,'Visible','off');
+            set(bObjectWidth4T,'Visible','off');
+            set(bObjectDepth4T,'Visible','off');
+            set(bObjectHeight4T,'Visible','off');
+            set(bObjectX5T,'Visible','off');
+            set(bObjectY5T,'Visible','off');
+            set(bObjectZ5T,'Visible','off');
+            set(bObjectWidth5T,'Visible','off');
+            set(bObjectDepth5T,'Visible','off');
+            set(bObjectHeight5T,'Visible','off');
+        case 4
+            set(bObjectX5,'Visible','off');
+            set(bObjectY5,'Visible','off');
+            set(bObjectZ5,'Visible','off');
+            set(bObjectWidth5,'Visible','off');
+            set(bObjectDepth5,'Visible','off');
+            set(bObjectHeight5,'Visible','off');
+            
+            set(bObjectX5T,'Visible','off');
+            set(bObjectY5T,'Visible','off');
+            set(bObjectZ5T,'Visible','off');
+            set(bObjectWidth5T,'Visible','off');
+            set(bObjectDepth5T,'Visible','off');
+            set(bObjectHeight5T,'Visible','off');
+    end
     
     function update3DPointS(~,~)
         pan = get(bPan,'Value');
@@ -268,6 +669,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         farInterCheck = get(bInterFar,'Value');
         heightInterCheck = get(bInterHeight,'Value');
         conInterCheck = get(bInterCon,'Value');
+        numberOfObjects = get(bNumberOfObjects,'Value') - 1;
         
         camPos = [camPosX camPosY camPosZ];
 
@@ -310,43 +712,112 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
 
         % Нахождения конъюнкции многоугольников на высоте ограничения и на полу
         conjunction = planesConjunction(planeInterLimit,planeInterFloor);
+        
+        % Создание объектов и нахождение слепых зон
+        interNearPoly = polyshape(planeInterNear(:,1:2));
+        interMidPoly = polyshape(planeInterMid(:,1:2));
+        interFarPoly = polyshape(planeInterFar(:,1:2));
+
+        parallelepipeds = cell(maxNumberOfObjects,1);
+
+        floorPoly = polyshape(planeInterFloor(:,1:2));
+
+        for j = 1:maxNumberOfObjects
+            switch j
+                case 1
+                    x = str2double(get(bObjectX1,'String'));
+                    y = str2double(get(bObjectY1,'String'));
+                    z = str2double(get(bObjectZ1,'String'));
+                    width = str2double(get(bObjectWidth1,'String'));
+                    depth = str2double(get(bObjectDepth1,'String'));
+                    height = str2double(get(bObjectHeight1,'String'));
+                case 2
+                    x = str2double(get(bObjectX2,'String'));
+                    y = str2double(get(bObjectY2,'String'));
+                    z = str2double(get(bObjectZ2,'String'));
+                    width = str2double(get(bObjectWidth2,'String'));
+                    depth = str2double(get(bObjectDepth2,'String'));
+                    height = str2double(get(bObjectHeight2,'String'));
+                case 3
+                    x = str2double(get(bObjectX3,'String'));
+                    y = str2double(get(bObjectY3,'String'));
+                    z = str2double(get(bObjectZ3,'String'));
+                    width = str2double(get(bObjectWidth3,'String'));
+                    depth = str2double(get(bObjectDepth3,'String'));
+                    height = str2double(get(bObjectHeight3,'String'));
+                case 4
+                    x = str2double(get(bObjectX4,'String'));
+                    y = str2double(get(bObjectY4,'String'));
+                    z = str2double(get(bObjectZ4,'String'));
+                    width = str2double(get(bObjectWidth4,'String'));
+                    depth = str2double(get(bObjectDepth4,'String'));
+                    height = str2double(get(bObjectHeight4,'String'));
+                case 5
+                    x = str2double(get(bObjectX5,'String'));
+                    y = str2double(get(bObjectY5,'String'));
+                    z = str2double(get(bObjectZ5,'String'));
+                    width = str2double(get(bObjectWidth5,'String'));
+                    depth = str2double(get(bObjectDepth5,'String'));
+                    height = str2double(get(bObjectHeight5,'String'));
+            end
+            parallelepipeds{j,1} = getParallelepiped(width,depth,height,[x y z]);
+            if ((j <= numberOfObjects) && (~isBehind(parallelepipeds{j,1},T,camPos)))
+                TRPlane = planeProjection(parallelepipeds{j,1},X,V0,T,camPos,upRightFar,upLeftFar);
+                unPoly = unionPolygons(TRPlane);
+                floorPoly = subtract(floorPoly,unPoly);
+            end
+        end
+
+        if ((numberOfObjects > 0) && (numberOfObjects <= maxNumberOfObjects))
+            interNearPoly = intersect(interNearPoly,floorPoly);
+            interMidPoly = intersect(interMidPoly,floorPoly);
+            interFarPoly = intersect(interFarPoly,floorPoly);
+        end
+        
+        % Перемещение polyshape на нужную высоту (на будущее)
+        %     M = [   1   0   0   0
+        %             0   1   0   0
+        %             0   0   1   10
+        %             0   0   0   1   ];
+        %     t=hgtransform('Matrix',M);     
+        %     Hpgon = plot(interFarPoly,'Parent',t,'FaceColor','r');
 
         % Если рёбра frustum пересекают плоскость пола, то строим пересечение на
         % графике
         if nearInterCheck == 1
-            set(interNear, 'visible', 'on');
-            [mNear, ~] = size(planeInterNear);
+            interNear.Visible = 'on';
+            [mNear, ~] = size(interNearPoly.Vertices);
             if (mNear < 3)
-                set(interNear, 'XData', [0 0 0], 'YData', [0 0 0], 'ZData', [0 0 0]);
+                interNear.Shape.Vertices = [];
             else
-                set(interNear, 'XData', planeInterNear(:,1), 'YData', planeInterNear(:,2), 'ZData', planeInterNear(:,3));
+                interNear.Shape.Vertices = interNearPoly.Vertices;
             end
         else
-            set(interNear, 'visible', 'off');
+            interNear.Visible = 'off';
         end
 
         if midInterCheck == 1
-            set(interMid, 'visible', 'on');
-            [mMid, ~] = size(planeInterMid);
+            interMid.Visible = 'on';
+            [mMid, ~] = size(interMidPoly.Vertices);
             if (mMid < 3)
-                set(interMid, 'XData', [0 0 0], 'YData', [0 0 0], 'ZData', [0 0 0]);
+                interMid.Shape.Vertices = [];
             else
-                set(interMid, 'XData', planeInterMid(:,1), 'YData', planeInterMid(:,2), 'ZData', planeInterMid(:,3));
+                interMid.Shape.Vertices = interMidPoly.Vertices;
             end
         else
-            set(interMid, 'visible', 'off');
+            interMid.Visible = 'off';
         end
 
         if farInterCheck == 1
-            set(interFar, 'visible', 'on');
-            [mFar, ~] = size(planeInterFar);
+            interFar.Visible = 'on';
+            [mFar, ~] = size(interFarPoly.Vertices);
             if (mFar < 3)
-                set(interFar, 'XData', [0 0 0], 'YData', [0 0 0], 'ZData', [0 0 0]);
+                interFar.Shape.Vertices = [];
             else
-                set(interFar, 'XData', planeInterFar(:,1), 'YData', planeInterFar(:,2), 'ZData', planeInterFar(:,3));
+                interFar.Shape.Vertices = interFarPoly.Vertices;
             end
         else
-            set(interFar, 'visible', 'off');
+            interFar.Visible = 'off';
         end
         
         % Если рёбра полного frustum пересекают плоскость ограничения по
@@ -374,6 +845,17 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             end
         else
             set(interCon, 'visible', 'off');
+        end
+        
+        % Построение объектов (препятствий) на графике
+        for j = 1:maxNumberOfObjects
+            paralSurf{j,1}.Vertices = parallelepipeds{j,1}.Points;
+            hold on;
+            if j > numberOfObjects
+                paralSurf{j,1}.Visible = 'off';
+            else
+                paralSurf{j,1}.Visible = 'on';
+            end
         end
 
         % Переопределение построенных frustum`ов
@@ -428,6 +910,381 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             set(frustumLeftFar, 'visible', 'off');
             set(frustumDownFar, 'visible', 'off');
             set(frustumRightFar, 'visible', 'off');
+        end
+        
+        switch numberOfObjects
+            case 0
+                set(bObjectX1,'Visible','off');
+                set(bObjectY1,'Visible','off');
+                set(bObjectZ1,'Visible','off');
+                set(bObjectWidth1,'Visible','off');
+                set(bObjectDepth1,'Visible','off');
+                set(bObjectHeight1,'Visible','off');
+                set(bObjectX2,'Visible','off');
+                set(bObjectY2,'Visible','off');
+                set(bObjectZ2,'Visible','off');
+                set(bObjectWidth2,'Visible','off');
+                set(bObjectDepth2,'Visible','off');
+                set(bObjectHeight2,'Visible','off');
+                set(bObjectX3,'Visible','off');
+                set(bObjectY3,'Visible','off');
+                set(bObjectZ3,'Visible','off');
+                set(bObjectWidth3,'Visible','off');
+                set(bObjectDepth3,'Visible','off');
+                set(bObjectHeight3,'Visible','off');
+                set(bObjectX4,'Visible','off');
+                set(bObjectY4,'Visible','off');
+                set(bObjectZ4,'Visible','off');
+                set(bObjectWidth4,'Visible','off');
+                set(bObjectDepth4,'Visible','off');
+                set(bObjectHeight4,'Visible','off');
+                set(bObjectX5,'Visible','off');
+                set(bObjectY5,'Visible','off');
+                set(bObjectZ5,'Visible','off');
+                set(bObjectWidth5,'Visible','off');
+                set(bObjectDepth5,'Visible','off');
+                set(bObjectHeight5,'Visible','off');
+
+                set(bObjectX1T,'Visible','off');
+                set(bObjectY1T,'Visible','off');
+                set(bObjectZ1T,'Visible','off');
+                set(bObjectWidth1T,'Visible','off');
+                set(bObjectDepth1T,'Visible','off');
+                set(bObjectHeight1T,'Visible','off');
+                set(bObjectX2T,'Visible','off');
+                set(bObjectY2T,'Visible','off');
+                set(bObjectZ2T,'Visible','off');
+                set(bObjectWidth2T,'Visible','off');
+                set(bObjectDepth2T,'Visible','off');
+                set(bObjectHeight2T,'Visible','off');
+                set(bObjectX3T,'Visible','off');
+                set(bObjectY3T,'Visible','off');
+                set(bObjectZ3T,'Visible','off');
+                set(bObjectWidth3T,'Visible','off');
+                set(bObjectDepth3T,'Visible','off');
+                set(bObjectHeight3T,'Visible','off');
+                set(bObjectX4T,'Visible','off');
+                set(bObjectY4T,'Visible','off');
+                set(bObjectZ4T,'Visible','off');
+                set(bObjectWidth4T,'Visible','off');
+                set(bObjectDepth4T,'Visible','off');
+                set(bObjectHeight4T,'Visible','off');
+                set(bObjectX5T,'Visible','off');
+                set(bObjectY5T,'Visible','off');
+                set(bObjectZ5T,'Visible','off');
+                set(bObjectWidth5T,'Visible','off');
+                set(bObjectDepth5T,'Visible','off');
+                set(bObjectHeight5T,'Visible','off');
+            case 1
+                set(bObjectX1,'Visible','on');
+                set(bObjectY1,'Visible','on');
+                set(bObjectZ1,'Visible','on');
+                set(bObjectWidth1,'Visible','on');
+                set(bObjectDepth1,'Visible','on');
+                set(bObjectHeight1,'Visible','on');
+                set(bObjectX2,'Visible','off');
+                set(bObjectY2,'Visible','off');
+                set(bObjectZ2,'Visible','off');
+                set(bObjectWidth2,'Visible','off');
+                set(bObjectDepth2,'Visible','off');
+                set(bObjectHeight2,'Visible','off');
+                set(bObjectX3,'Visible','off');
+                set(bObjectY3,'Visible','off');
+                set(bObjectZ3,'Visible','off');
+                set(bObjectWidth3,'Visible','off');
+                set(bObjectDepth3,'Visible','off');
+                set(bObjectHeight3,'Visible','off');
+                set(bObjectX4,'Visible','off');
+                set(bObjectY4,'Visible','off');
+                set(bObjectZ4,'Visible','off');
+                set(bObjectWidth4,'Visible','off');
+                set(bObjectDepth4,'Visible','off');
+                set(bObjectHeight4,'Visible','off');
+                set(bObjectX5,'Visible','off');
+                set(bObjectY5,'Visible','off');
+                set(bObjectZ5,'Visible','off');
+                set(bObjectWidth5,'Visible','off');
+                set(bObjectDepth5,'Visible','off');
+                set(bObjectHeight5,'Visible','off');
+
+                set(bObjectX1T,'Visible','on');
+                set(bObjectY1T,'Visible','on');
+                set(bObjectZ1T,'Visible','on');
+                set(bObjectWidth1T,'Visible','on');
+                set(bObjectDepth1T,'Visible','on');
+                set(bObjectHeight1T,'Visible','on');
+                set(bObjectX2T,'Visible','off');
+                set(bObjectY2T,'Visible','off');
+                set(bObjectZ2T,'Visible','off');
+                set(bObjectWidth2T,'Visible','off');
+                set(bObjectDepth2T,'Visible','off');
+                set(bObjectHeight2T,'Visible','off');
+                set(bObjectX3T,'Visible','off');
+                set(bObjectY3T,'Visible','off');
+                set(bObjectZ3T,'Visible','off');
+                set(bObjectWidth3T,'Visible','off');
+                set(bObjectDepth3T,'Visible','off');
+                set(bObjectHeight3T,'Visible','off');
+                set(bObjectX4T,'Visible','off');
+                set(bObjectY4T,'Visible','off');
+                set(bObjectZ4T,'Visible','off');
+                set(bObjectWidth4T,'Visible','off');
+                set(bObjectDepth4T,'Visible','off');
+                set(bObjectHeight4T,'Visible','off');
+                set(bObjectX5T,'Visible','off');
+                set(bObjectY5T,'Visible','off');
+                set(bObjectZ5T,'Visible','off');
+                set(bObjectWidth5T,'Visible','off');
+                set(bObjectDepth5T,'Visible','off');
+                set(bObjectHeight5T,'Visible','off');
+            case 2
+                set(bObjectX1,'Visible','on');
+                set(bObjectY1,'Visible','on');
+                set(bObjectZ1,'Visible','on');
+                set(bObjectWidth1,'Visible','on');
+                set(bObjectDepth1,'Visible','on');
+                set(bObjectHeight1,'Visible','on');
+                set(bObjectX2,'Visible','on');
+                set(bObjectY2,'Visible','on');
+                set(bObjectZ2,'Visible','on');
+                set(bObjectWidth2,'Visible','on');
+                set(bObjectDepth2,'Visible','on');
+                set(bObjectHeight2,'Visible','on');
+                set(bObjectX3,'Visible','off');
+                set(bObjectY3,'Visible','off');
+                set(bObjectZ3,'Visible','off');
+                set(bObjectWidth3,'Visible','off');
+                set(bObjectDepth3,'Visible','off');
+                set(bObjectHeight3,'Visible','off');
+                set(bObjectX4,'Visible','off');
+                set(bObjectY4,'Visible','off');
+                set(bObjectZ4,'Visible','off');
+                set(bObjectWidth4,'Visible','off');
+                set(bObjectDepth4,'Visible','off');
+                set(bObjectHeight4,'Visible','off');
+                set(bObjectX5,'Visible','off');
+                set(bObjectY5,'Visible','off');
+                set(bObjectZ5,'Visible','off');
+                set(bObjectWidth5,'Visible','off');
+                set(bObjectDepth5,'Visible','off');
+                set(bObjectHeight5,'Visible','off');
+
+                set(bObjectX1T,'Visible','on');
+                set(bObjectY1T,'Visible','on');
+                set(bObjectZ1T,'Visible','on');
+                set(bObjectWidth1T,'Visible','on');
+                set(bObjectDepth1T,'Visible','on');
+                set(bObjectHeight1T,'Visible','on');
+                set(bObjectX2T,'Visible','on');
+                set(bObjectY2T,'Visible','on');
+                set(bObjectZ2T,'Visible','on');
+                set(bObjectWidth2T,'Visible','on');
+                set(bObjectDepth2T,'Visible','on');
+                set(bObjectHeight2T,'Visible','on');
+                set(bObjectX3T,'Visible','off');
+                set(bObjectY3T,'Visible','off');
+                set(bObjectZ3T,'Visible','off');
+                set(bObjectWidth3T,'Visible','off');
+                set(bObjectDepth3T,'Visible','off');
+                set(bObjectHeight3T,'Visible','off');
+                set(bObjectX4T,'Visible','off');
+                set(bObjectY4T,'Visible','off');
+                set(bObjectZ4T,'Visible','off');
+                set(bObjectWidth4T,'Visible','off');
+                set(bObjectDepth4T,'Visible','off');
+                set(bObjectHeight4T,'Visible','off');
+                set(bObjectX5T,'Visible','off');
+                set(bObjectY5T,'Visible','off');
+                set(bObjectZ5T,'Visible','off');
+                set(bObjectWidth5T,'Visible','off');
+                set(bObjectDepth5T,'Visible','off');
+                set(bObjectHeight5T,'Visible','off');
+            case 3
+                set(bObjectX1,'Visible','on');
+                set(bObjectY1,'Visible','on');
+                set(bObjectZ1,'Visible','on');
+                set(bObjectWidth1,'Visible','on');
+                set(bObjectDepth1,'Visible','on');
+                set(bObjectHeight1,'Visible','on');
+                set(bObjectX2,'Visible','on');
+                set(bObjectY2,'Visible','on');
+                set(bObjectZ2,'Visible','on');
+                set(bObjectWidth2,'Visible','on');
+                set(bObjectDepth2,'Visible','on');
+                set(bObjectHeight2,'Visible','on');
+                set(bObjectX3,'Visible','on');
+                set(bObjectY3,'Visible','on');
+                set(bObjectZ3,'Visible','on');
+                set(bObjectWidth3,'Visible','on');
+                set(bObjectDepth3,'Visible','on');
+                set(bObjectHeight3,'Visible','on');
+                set(bObjectX4,'Visible','off');
+                set(bObjectY4,'Visible','off');
+                set(bObjectZ4,'Visible','off');
+                set(bObjectWidth4,'Visible','off');
+                set(bObjectDepth4,'Visible','off');
+                set(bObjectHeight4,'Visible','off');
+                set(bObjectX5,'Visible','off');
+                set(bObjectY5,'Visible','off');
+                set(bObjectZ5,'Visible','off');
+                set(bObjectWidth5,'Visible','off');
+                set(bObjectDepth5,'Visible','off');
+                set(bObjectHeight5,'Visible','off');
+
+                set(bObjectX1T,'Visible','on');
+                set(bObjectY1T,'Visible','on');
+                set(bObjectZ1T,'Visible','on');
+                set(bObjectWidth1T,'Visible','on');
+                set(bObjectDepth1T,'Visible','on');
+                set(bObjectHeight1T,'Visible','on');
+                set(bObjectX2T,'Visible','on');
+                set(bObjectY2T,'Visible','on');
+                set(bObjectZ2T,'Visible','on');
+                set(bObjectWidth2T,'Visible','on');
+                set(bObjectDepth2T,'Visible','on');
+                set(bObjectHeight2T,'Visible','on');
+                set(bObjectX3T,'Visible','on');
+                set(bObjectY3T,'Visible','on');
+                set(bObjectZ3T,'Visible','on');
+                set(bObjectWidth3T,'Visible','on');
+                set(bObjectDepth3T,'Visible','on');
+                set(bObjectHeight3T,'Visible','on');
+                set(bObjectX4T,'Visible','off');
+                set(bObjectY4T,'Visible','off');
+                set(bObjectZ4T,'Visible','off');
+                set(bObjectWidth4T,'Visible','off');
+                set(bObjectDepth4T,'Visible','off');
+                set(bObjectHeight4T,'Visible','off');
+                set(bObjectX5T,'Visible','off');
+                set(bObjectY5T,'Visible','off');
+                set(bObjectZ5T,'Visible','off');
+                set(bObjectWidth5T,'Visible','off');
+                set(bObjectDepth5T,'Visible','off');
+                set(bObjectHeight5T,'Visible','off');
+            case 4
+                set(bObjectX1,'Visible','on');
+                set(bObjectY1,'Visible','on');
+                set(bObjectZ1,'Visible','on');
+                set(bObjectWidth1,'Visible','on');
+                set(bObjectDepth1,'Visible','on');
+                set(bObjectHeight1,'Visible','on');
+                set(bObjectX2,'Visible','on');
+                set(bObjectY2,'Visible','on');
+                set(bObjectZ2,'Visible','on');
+                set(bObjectWidth2,'Visible','on');
+                set(bObjectDepth2,'Visible','on');
+                set(bObjectHeight2,'Visible','on');
+                set(bObjectX3,'Visible','on');
+                set(bObjectY3,'Visible','on');
+                set(bObjectZ3,'Visible','on');
+                set(bObjectWidth3,'Visible','on');
+                set(bObjectDepth3,'Visible','on');
+                set(bObjectHeight3,'Visible','on');
+                set(bObjectX4,'Visible','on');
+                set(bObjectY4,'Visible','on');
+                set(bObjectZ4,'Visible','on');
+                set(bObjectWidth4,'Visible','on');
+                set(bObjectDepth4,'Visible','on');
+                set(bObjectHeight4,'Visible','on');
+                set(bObjectX5,'Visible','off');
+                set(bObjectY5,'Visible','off');
+                set(bObjectZ5,'Visible','off');
+                set(bObjectWidth5,'Visible','off');
+                set(bObjectDepth5,'Visible','off');
+                set(bObjectHeight5,'Visible','off');
+
+                set(bObjectX1T,'Visible','on');
+                set(bObjectY1T,'Visible','on');
+                set(bObjectZ1T,'Visible','on');
+                set(bObjectWidth1T,'Visible','on');
+                set(bObjectDepth1T,'Visible','on');
+                set(bObjectHeight1T,'Visible','on');
+                set(bObjectX2T,'Visible','on');
+                set(bObjectY2T,'Visible','on');
+                set(bObjectZ2T,'Visible','on');
+                set(bObjectWidth2T,'Visible','on');
+                set(bObjectDepth2T,'Visible','on');
+                set(bObjectHeight2T,'Visible','on');
+                set(bObjectX3T,'Visible','on');
+                set(bObjectY3T,'Visible','on');
+                set(bObjectZ3T,'Visible','on');
+                set(bObjectWidth3T,'Visible','on');
+                set(bObjectDepth3T,'Visible','on');
+                set(bObjectHeight3T,'Visible','on');
+                set(bObjectX4T,'Visible','on');
+                set(bObjectY4T,'Visible','on');
+                set(bObjectZ4T,'Visible','on');
+                set(bObjectWidth4T,'Visible','on');
+                set(bObjectDepth4T,'Visible','on');
+                set(bObjectHeight4T,'Visible','on');
+                set(bObjectX5T,'Visible','off');
+                set(bObjectY5T,'Visible','off');
+                set(bObjectZ5T,'Visible','off');
+                set(bObjectWidth5T,'Visible','off');
+                set(bObjectDepth5T,'Visible','off');
+                set(bObjectHeight5T,'Visible','off');
+            case 5
+                set(bObjectX1,'Visible','on');
+                set(bObjectY1,'Visible','on');
+                set(bObjectZ1,'Visible','on');
+                set(bObjectWidth1,'Visible','on');
+                set(bObjectDepth1,'Visible','on');
+                set(bObjectHeight1,'Visible','on');
+                set(bObjectX2,'Visible','on');
+                set(bObjectY2,'Visible','on');
+                set(bObjectZ2,'Visible','on');
+                set(bObjectWidth2,'Visible','on');
+                set(bObjectDepth2,'Visible','on');
+                set(bObjectHeight2,'Visible','on');
+                set(bObjectX3,'Visible','on');
+                set(bObjectY3,'Visible','on');
+                set(bObjectZ3,'Visible','on');
+                set(bObjectWidth3,'Visible','on');
+                set(bObjectDepth3,'Visible','on');
+                set(bObjectHeight3,'Visible','on');
+                set(bObjectX4,'Visible','on');
+                set(bObjectY4,'Visible','on');
+                set(bObjectZ4,'Visible','on');
+                set(bObjectWidth4,'Visible','on');
+                set(bObjectDepth4,'Visible','on');
+                set(bObjectHeight4,'Visible','on');
+                set(bObjectX5,'Visible','on');
+                set(bObjectY5,'Visible','on');
+                set(bObjectZ5,'Visible','on');
+                set(bObjectWidth5,'Visible','on');
+                set(bObjectDepth5,'Visible','on');
+                set(bObjectHeight5,'Visible','on');
+
+                set(bObjectX1T,'Visible','on');
+                set(bObjectY1T,'Visible','on');
+                set(bObjectZ1T,'Visible','on');
+                set(bObjectWidth1T,'Visible','on');
+                set(bObjectDepth1T,'Visible','on');
+                set(bObjectHeight1T,'Visible','on');
+                set(bObjectX2T,'Visible','on');
+                set(bObjectY2T,'Visible','on');
+                set(bObjectZ2T,'Visible','on');
+                set(bObjectWidth2T,'Visible','on');
+                set(bObjectDepth2T,'Visible','on');
+                set(bObjectHeight2T,'Visible','on');
+                set(bObjectX3T,'Visible','on');
+                set(bObjectY3T,'Visible','on');
+                set(bObjectZ3T,'Visible','on');
+                set(bObjectWidth3T,'Visible','on');
+                set(bObjectDepth3T,'Visible','on');
+                set(bObjectHeight3T,'Visible','on');
+                set(bObjectX4T,'Visible','on');
+                set(bObjectY4T,'Visible','on');
+                set(bObjectZ4T,'Visible','on');
+                set(bObjectWidth4T,'Visible','on');
+                set(bObjectDepth4T,'Visible','on');
+                set(bObjectHeight4T,'Visible','on');
+                set(bObjectX5T,'Visible','on');
+                set(bObjectY5T,'Visible','on');
+                set(bObjectZ5T,'Visible','on');
+                set(bObjectWidth5T,'Visible','on');
+                set(bObjectDepth5T,'Visible','on');
+                set(bObjectHeight5T,'Visible','on');
         end
     end
 end
