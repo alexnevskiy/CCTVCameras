@@ -60,7 +60,12 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     for i = 1:maxNumberOfObjects
         parallelepipeds{i,1} = getParallelepiped(i,i,i*2,[i*2 i*2 0]);
         if ((i <= numberOfObjects) && (~isBehind(parallelepipeds{i,1},T,camPos)))
-            TRPlane = planeProjection(parallelepipeds{i,1},X,V0,T,camPos,upRightFar,upLeftFar);
+            if (isBehind(parallelepipeds{i,1},X,V0))
+                liftTR = liftParallelepipedBase(parallelepipeds{i,1},V0);
+                TRPlane = planeProjection(liftTR,X,V0,T,camPos,upRightFar,upLeftFar);
+            else
+                TRPlane = planeProjection(parallelepipeds{i,1},X,V0,T,camPos,upRightFar,upLeftFar);
+            end
             unPoly = unionPolygons(TRPlane);
             floorPoly = subtract(floorPoly,unPoly);
         end
@@ -762,7 +767,13 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             end
             parallelepipeds{j,1} = getParallelepiped(width,depth,height,[x y z]);
             if ((j <= numberOfObjects) && (~isBehind(parallelepipeds{j,1},T,camPos)))
-                TRPlane = planeProjection(parallelepipeds{j,1},X,V0,T,camPos,upRightFar,upLeftFar);
+                if (isBehind(parallelepipeds{j,1},X,V0))
+                    liftTR = liftParallelepipedBase(parallelepipeds{j,1},V0);
+                    TRPlane = planeProjection(liftTR,X,V0,T,camPos,upRightFar,upLeftFar);
+                else
+                    TRPlane = planeProjection(parallelepipeds{j,1},X,V0,T,camPos,upRightFar,upLeftFar);
+                end
+%                 TRPlane = planeProjection(parallelepipeds{j,1},X,V0,T,camPos,upRightFar,upLeftFar);
                 unPoly = unionPolygons(TRPlane);
                 floorPoly = subtract(floorPoly,unPoly);
             end
