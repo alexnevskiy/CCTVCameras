@@ -1,11 +1,8 @@
-function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
+function plotFrustumIntersect(pan,tilt,roll,fovH,fovV,...
     nearClipPlane,middleClipPlane,farClipPlane,camPos,length,heightLimit,numberOfObjects)
-    % aspect = W / H;         % Соотношение сторон камеры
     
     fovHTan = tan(fovH / 2 / 180 * pi);
     fovVTan = tan(fovV / 2 / 180 * pi);
-    % halfHeight = nearClipPlane * fovVTan;
-    % halfWidth =  halfHeight / aspect;
 
     R = findRotationMatrix(pan,tilt,roll);      % Матрица поворота
     X = [0 0 1];                                % Вектор нормали (также просто ненулевой вектор)

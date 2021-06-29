@@ -1,8 +1,5 @@
 % Пример камеры видеонаблюдения взят отсюда (2 сверху): 
 % http://mikstmarine.ru/marine-cameras-specifications.html
-W = 1920;               % Ширина изображения
-H = 1080;               % Высота изображения
-% flen = 3.6 * 10^(-3);   % Фокусное расстояние (раздел "Объектив")
 pan = 0;                % Угол поворота вокруг оси Z
 tilt = 50;              % Угол поворота вокруг оси X
 roll = 0;               % Угол поворота вокруг оси Y
@@ -16,5 +13,5 @@ length = 150;           % Длина стороны плоскости пола
 heightLimit = 2;        % Ограничение по высоте
 numberOfObjects = 2;    % Количество объектов (максимум 5)
 
-plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,nearClipPlane,...
+plotFrustumIntersect(pan,tilt,roll,fovH,fovV,nearClipPlane,...
     middleClipPlane,farClipPlane,camPos,length,heightLimit,numberOfObjects)
