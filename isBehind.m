@@ -4,14 +4,24 @@ function behind = isBehind(TR,X,V0,mode)
     counter = 0;
     
     for i = 1:m
-        if dot(TR.Points(i,:) - V0, X) < 0
-            if strcmp(mode,'any')
+        if strcmp(mode,'any')
+            if dot(TR.Points(i,:) - V0, X) < 0
                 behind = true;
                 return
-            elseif strcmp(mode,'full')
+            end
+        elseif strcmp(mode,'full')
+            if dot(TR.Points(i,:) - V0, X) <= 0
                 counter = counter + 1;
             end
         end
+%         if dot(TR.Points(i,:) - V0, X) < 0
+%             if strcmp(mode,'any')
+%                 behind = true;
+%                 return
+%             elseif strcmp(mode,'full')
+%                 counter = counter + 1;
+%             end
+%         end
     end
     
     if counter == m

@@ -63,8 +63,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             if (isBehind(parallelepipeds{i,1},X,V0,'full'))
                 continue
             elseif (isBehind(parallelepipeds{i,1},X,V0,'any'))
-                liftTR = liftParallelepipedBase(parallelepipeds{i,1},V0);
-                TRPlane = planeProjection(liftTR,X,V0,T,camPos,upRightFar,upLeftFar);
+                TRInter = planeObjectIntersection(parallelepipeds{i,1},X,V0);
+                TRPlane = planeProjection(TRInter,X,V0,T,camPos,upRightFar,upLeftFar);
             else
                 TRPlane = planeProjection(parallelepipeds{i,1},X,V0,T,camPos,upRightFar,upLeftFar);
             end
@@ -772,8 +772,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                 if (isBehind(parallelepipeds{j,1},X,V0,'full'))
                     continue
                 elseif (isBehind(parallelepipeds{j,1},X,V0,'any'))
-                    liftTR = liftParallelepipedBase(parallelepipeds{j,1},V0);
-                    TRPlane = planeProjection(liftTR,X,V0,T,camPos,upRightFar,upLeftFar);
+                    TRInter = planeObjectIntersection(parallelepipeds{j,1},X,V0);
+                    TRPlane = planeProjection(TRInter,X,V0,T,camPos,upRightFar,upLeftFar);
                 else
                     TRPlane = planeProjection(parallelepipeds{j,1},X,V0,T,camPos,upRightFar,upLeftFar);
                 end
