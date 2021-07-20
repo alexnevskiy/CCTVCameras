@@ -86,6 +86,7 @@ function [interCheck, interCommon] = deleteCommon(interFar, interCheckFar, inter
                     interNear(j,:) = [];
                     interFar(i,:) = [];
                     mNear = mNear - 1;
+                    break;
                 end
             end
         end
