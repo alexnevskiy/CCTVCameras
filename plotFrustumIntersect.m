@@ -1,5 +1,6 @@
 function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
-    farClipPlane,camPos,length,heightLimit,numberOfObjects)
+    farClipPlane,camPos,heightLimit,numberOfObjects,...
+    roomW,roomD,roomH,camW,camD,camH)
 
     identPPM = 250;
     recogPPM = 125;
@@ -67,11 +68,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     [upRightMonitor,upLeftMonitor,downRightMonitor,downLeftMonitor] = findFrustumBase(monitorCenter,fovHTan,fovVTan,R,monitorDist);
     [upRightFar,upLeftFar,downRightFar,downLeftFar] = findFrustumBase(fcpCenter,fovHTan,fovVTan,R,farClipPlane);
     
-    A = [-length -length 0];    % Координаты точек пола
-    B = [-length length 0];
-    C = [length length 0];
-    D = [length -length 0];
-    V0 = [0 1 0];               % Любая точка на плоскости пола
+    V0 = [0 0 0];                                   % Любая точка на плоскости пола
+    room = getParallelepiped(roomW,roomD,roomH,V0); % Триангулированное помещение
 
     % Нахождение точек пересечения frustum'ов с плоскостью пола
     planeInterIdent = planeFrustumIntersect(X,V0,camPos,upRightIdent,upLeftIdent,downRightIdent,downLeftIdent);
@@ -138,6 +136,68 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         interFarPoly = intersect(interFarPoly,floorPoly);
     end
     
+    % Определение доступного места для установки камеры
+    roomAvailableW = roomW - 2 * camW;
+    roomAvailableD = roomD - 2 * camW;
+    roomAvailableH = roomH - (2 * camH + heightLimit);
+    
+    pointsNumberW = ceil(roomAvailableW * 2);
+    pointsNumberD = ceil(roomAvailableD * 2);
+    pointsNumberH = ceil(roomAvailableH * 2);
+    
+    placementStepW = roomAvailableW / pointsNumberW;
+    placementStepD = roomAvailableD / pointsNumberD;
+    placementStepH = roomAvailableH / pointsNumberH;
+    
+    % Расположение сетки точек возможных положений камеры (без учёта окон и
+    % дверей)
+    pointsX = zeros(pointsNumberW,1);
+    pointsY = zeros(pointsNumberD,1);
+    pointsZ = zeros(pointsNumberH,1);
+    
+    gridWallNear = cell(pointsNumberH,1);
+    gridWallLeft = cell(pointsNumberH,1);
+    gridWallFar = cell(pointsNumberH,1);
+    gridWallRight = cell(pointsNumberH,1);
+    gridRoof = cell(pointsNumberD,1);
+    
+    for i = 1:pointsNumberW         % Общие координаты точек сетки по X
+        pointsX(i,1) = camW + placementStepW * i;
+    end
+    
+    for i = 1:pointsNumberD         % Общие координаты точек сетки по Y
+        pointsY(i,1) = camW + placementStepD * i;
+    end
+    
+    for i = 1:pointsNumberH         % Общие координаты точек сетки по Z
+        pointsZ(i,1) = camH + heightLimit + placementStepH * i;
+    end
+    
+    for i = 1:pointsNumberH         % Заполнение сетки точками для ближней стены
+        gridWallNear{i,1} = [pointsX zeros(pointsNumberW,1) ones(pointsNumberW,1) * pointsZ(i,1)];
+    end
+    gridCam.WallNear = cat(1,gridWallNear{:});
+    
+    for i = 1:pointsNumberH         % Заполнение сетки точками для левой стены
+        gridWallLeft{i,1} = [zeros(pointsNumberD,1) pointsY ones(pointsNumberD,1) * pointsZ(i,1)];
+    end
+    gridCam.WallLeft = cat(1,gridWallLeft{:});
+    
+    for i = 1:pointsNumberH         % Заполнение сетки точками для дальней стены
+        gridWallFar{i,1} = [pointsX ones(pointsNumberW,1) * roomD ones(pointsNumberW,1) * pointsZ(i,1)];
+    end
+    gridCam.WallFar = cat(1,gridWallFar{:});
+
+    for i = 1:pointsNumberH         % Заполнение сетки точками для правой стены
+        gridWallRight{i,1} = [ones(pointsNumberD,1) * roomW pointsY ones(pointsNumberD,1) * pointsZ(i,1)];
+    end
+    gridCam.WallRight = cat(1,gridWallRight{:});
+    
+    for i = 1:pointsNumberD         % Заполнение сетки точками для потолка
+        gridRoof{i,1} = [pointsX ones(pointsNumberW,1) * pointsY(i,1) ones(pointsNumberW,1) * roomH];
+    end
+    gridCam.Roof = cat(1,gridRoof{:});
+    
     f = figure;
     identColor = 'red';
     recogColor = 'yellow';
@@ -147,6 +207,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     fColor = 'white';
     conColor = 'black';
     paralColor = 'magenta';
+    gridColor = 'green';
 
     % Если рёбра frustum пересекают плоскость пола, то строим пересечение на
     % графике (вместе со слепыми зонами)
@@ -288,16 +349,22 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     frustumDownFar = fill3(PFar(indDown, 1), PFar(indDown, 2), PFar(indDown, 3), fColor);
     frustumRightFar = fill3(PFar(indRight, 1), PFar(indRight, 2), PFar(indRight, 3), fColor);
     hold on
-
-    % Построение плоскости пола
-    allPlainPts = [A;B;C;D];
-    fill3(allPlainPts(:,1),allPlainPts(:,2),allPlainPts(:,3),'white');
+    
+    % Построение помещения
+    roomSurf = trisurf(room,'FaceColor','none','LineWidth',2);
     alpha(0.2);
-    hold on
+    hold on;
+    
+    % Построение сетки на стенах и потолке
+    gridWallNearPlot = plot3(gridCam.WallNear(:,1),gridCam.WallNear(:,2),gridCam.WallNear(:,3),'.','Color',gridColor);
+    gridWallLeftPlot = plot3(gridCam.WallLeft(:,1),gridCam.WallLeft(:,2),gridCam.WallLeft(:,3),'.','Color',gridColor);
+    gridWallFarPlot = plot3(gridCam.WallFar(:,1),gridCam.WallFar(:,2),gridCam.WallFar(:,3),'.','Color',gridColor);
+    gridWallRightPlot = plot3(gridCam.WallRight(:,1),gridCam.WallRight(:,2),gridCam.WallRight(:,3),'.','Color',gridColor);
+    gridRoofPlot = plot3(gridCam.Roof(:,1),gridCam.Roof(:,2),gridCam.Roof(:,3),'.','Color',gridColor);
 
     % Построение камеры
     pose = rigid3d(R,camPos);
-    cam = plotCamera('AbsolutePose',pose,'Opacity',0, 'AxesVisible', false);
+    cam = plotCamera('AbsolutePose',pose,'Opacity',0,'AxesVisible',false,'Size',camD);
 
     grid on
     axis equal
@@ -422,6 +489,36 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                
     bInterCon = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+161,54,130,23],...
                    'Value', 1, 'String', 'Conjunction Intersection', 'Callback', {@update3DPointS});
+               
+    bRoomW = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81+130,54+distV*3,50,23],...
+                  'Value', roomW, 'String', roomW, 'Callback', {@update3DPointS});
+    uicontrol('Parent',f,'Style','text','Position',[81+130,25+distV*3,50,23],...
+                    'String','Room Width','BackgroundColor',bgcolor);
+
+    bRoomD = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81+130,54+distV*4,50,23],...
+                  'Value', roomD, 'String', roomD, 'Callback', {@update3DPointS});
+    uicontrol('Parent',f,'Style','text','Position',[81+130,25+distV*4,50,23],...
+                    'String','Room Depth','BackgroundColor',bgcolor);
+    
+    bRoomH = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81+130,54+distV*5,50,23],...
+                  'Value', roomH, 'String', roomH, 'Callback', {@update3DPointS});
+    uicontrol('Parent',f,'Style','text','Position',[81+130,25+distV*5,50,23],...
+                    'String','Room Height','BackgroundColor',bgcolor);
+                
+    bCamW = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*2+130,54+distV*3,50,23],...
+                  'Value', camW, 'String', camW, 'Callback', {@update3DPointS});
+    uicontrol('Parent',f,'Style','text','Position',[81*2+130,25+distV*3,50,23],...
+                    'String','Camera Width','BackgroundColor',bgcolor);
+
+    bCamD = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*2+130,54+distV*4,50,23],...
+                  'Value', camD, 'String', camD, 'Callback', {@update3DPointS});
+    uicontrol('Parent',f,'Style','text','Position',[81*2+130,25+distV*4,50,23],...
+                    'String','Camera Depth','BackgroundColor',bgcolor);
+    
+    bCamH = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*2+130,54+distV*5,50,23],...
+                  'Value', camH, 'String', camH, 'Callback', {@update3DPointS});
+    uicontrol('Parent',f,'Style','text','Position',[81*2+130,25+distV*5,50,23],...
+                    'String','Camera Height','BackgroundColor',bgcolor);
     
     bNumberOfObjects = uicontrol('Parent', f, 'Style', 'popupmenu', 'Position', [81*4+distH+251,54+distV*3/2,50,23],...
                    'Value', numberOfObjects + 1, 'String', {'0','1','2','3','4','5'}, 'Callback', {@update3DPointS});
@@ -814,6 +911,12 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         heightInterCheck = get(bInterHeight,'Value');
         conInterCheck = get(bInterCon,'Value');
         numberOfObjects = get(bNumberOfObjects,'Value') - 1;
+        roomW = str2double(get(bRoomW,'String'));
+        roomD = str2double(get(bRoomD,'String'));
+        roomH = str2double(get(bRoomH,'String'));
+        camW = str2double(get(bCamW,'String'));
+        camD = str2double(get(bCamD,'String'));
+        camH = str2double(get(bCamH,'String'));
         
         camPos = [camPosX camPosY camPosZ];
 
@@ -832,7 +935,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         
         R = findRotationMatrix(pan,tilt,roll);
         pose = rigid3d(R,camPos);
-        cam.AbsolutePose = pose; 
+        cam.AbsolutePose = pose;
+        cam.Size = camD;
 
         X = [0 0 1];                                % Вектор нормали (также просто ненулевой вектор)
         T = X * R;                                  % Вектор направления камеры
@@ -879,6 +983,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         [upRightDetect,upLeftDetect,downRightDetect,downLeftDetect] = findFrustumBase(detectCenter,fovHTan,fovVTan,R,detectDist);
         [upRightMonitor,upLeftMonitor,downRightMonitor,downLeftMonitor] = findFrustumBase(monitorCenter,fovHTan,fovVTan,R,monitorDist);
         [upRightFar,upLeftFar,downRightFar,downLeftFar] = findFrustumBase(fcpCenter,fovHTan,fovVTan,R,farClipPlane);
+        
+        room = getParallelepiped(roomW,roomD,roomH,V0); % Триангулированное помещение
         
         % Нахождение точек пересечения frustum с плоскостью пола
         planeInterIdent = planeFrustumIntersect(X,V0,camPos,upRightIdent,upLeftIdent,downRightIdent,downLeftIdent);
@@ -981,6 +1087,68 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             interFarPoly = intersect(interFarPoly,floorPoly);
         end
         
+        % Определение доступного места для установки камеры
+        roomAvailableW = roomW - 2 * camW;
+        roomAvailableD = roomD - 2 * camW;
+        roomAvailableH = roomH - (2 * camH + heightLimit);
+
+        pointsNumberW = ceil(roomAvailableW * 2);
+        pointsNumberD = ceil(roomAvailableD * 2);
+        pointsNumberH = ceil(roomAvailableH * 2);
+
+        placementStepW = roomAvailableW / pointsNumberW;
+        placementStepD = roomAvailableD / pointsNumberD;
+        placementStepH = roomAvailableH / pointsNumberH;
+
+        % Расположение сетки точек возможных положений камеры (без учёта окон и
+        % дверей)
+        pointsX = zeros(pointsNumberW,1);
+        pointsY = zeros(pointsNumberD,1);
+        pointsZ = zeros(pointsNumberH,1);
+
+        gridWallNear = cell(pointsNumberH,1);
+        gridWallLeft = cell(pointsNumberH,1);
+        gridWallFar = cell(pointsNumberH,1);
+        gridWallRight = cell(pointsNumberH,1);
+        gridRoof = cell(pointsNumberD,1);
+
+        for j = 1:pointsNumberW         % Общие координаты точек сетки по X
+            pointsX(j,1) = camW + placementStepW * j;
+        end
+
+        for j = 1:pointsNumberD         % Общие координаты точек сетки по Y
+            pointsY(j,1) = camW + placementStepD * j;
+        end
+
+        for j = 1:pointsNumberH         % Общие координаты точек сетки по Z
+            pointsZ(j,1) = camH + heightLimit + placementStepH * j;
+        end
+
+        for j = 1:pointsNumberH         % Заполнение сетки точками для ближней стены
+            gridWallNear{j,1} = [pointsX zeros(pointsNumberW,1) ones(pointsNumberW,1) * pointsZ(j,1)];
+        end
+        gridCam.WallNear = cat(1,gridWallNear{:});
+
+        for j = 1:pointsNumberH         % Заполнение сетки точками для левой стены
+            gridWallLeft{j,1} = [zeros(pointsNumberD,1) pointsY ones(pointsNumberD,1) * pointsZ(j,1)];
+        end
+        gridCam.WallLeft = cat(1,gridWallLeft{:});
+
+        for j = 1:pointsNumberH         % Заполнение сетки точками для дальней стены
+            gridWallFar{j,1} = [pointsX ones(pointsNumberW,1) * roomD ones(pointsNumberW,1) * pointsZ(j,1)];
+        end
+        gridCam.WallFar = cat(1,gridWallFar{:});
+
+        for j = 1:pointsNumberH         % Заполнение сетки точками для правой стены
+            gridWallRight{j,1} = [ones(pointsNumberD,1) * roomW pointsY ones(pointsNumberD,1) * pointsZ(j,1)];
+        end
+        gridCam.WallRight = cat(1,gridWallRight{:});
+
+        for j = 1:pointsNumberD         % Заполнение сетки точками для потолка
+            gridRoof{j,1} = [pointsX ones(pointsNumberW,1) * pointsY(j,1) ones(pointsNumberW,1) * roomH];
+        end
+        gridCam.Roof = cat(1,gridRoof{:});
+        
         % Перемещение polyshape на нужную высоту (на будущее)
         %     M = [   1   0   0   0
         %             0   1   0   0
@@ -1066,28 +1234,28 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         % Если рёбра полного frustum пересекают плоскость ограничения по
         % высоте, то строим пересечение на графике
         if heightInterCheck == 1
-            set(interHeight, 'visible', 'on');
+            set(interHeight,'visible','on');
             [mHeight, ~] = size(planeInterLimit);
             if (mHeight < 3)
-                set(interHeight, 'XData', [0 0 0], 'YData', [0 0 0], 'ZData', [0 0 0]);
+                set(interHeight,'XData',[0 0 0],'YData',[0 0 0],'ZData',[0 0 0]);
             else
-                set(interHeight, 'XData', planeInterLimit(:,1), 'YData', planeInterLimit(:,2), 'ZData', planeInterLimit(:,3));
+                set(interHeight,'XData',planeInterLimit(:,1),'YData',planeInterLimit(:,2),'ZData',planeInterLimit(:,3));
             end
         else
-            set(interHeight, 'visible', 'off');
+            set(interHeight,'visible','off');
         end
 
         % Если конъюнкция плоскостей - многоугольник, то строим её на графике
         if conInterCheck == 1
-            set(interCon, 'visible', 'on');
+            set(interCon,'visible','on');
             [mCon, ~] = size(conjunction);
             if (mCon < 3)
-                set(interCon, 'XData', [0 0 0], 'YData', [0 0 0], 'ZData', [0 0 0]);
+                set(interCon,'XData',[0 0 0],'YData',[0 0 0],'ZData',[0 0 0]);
             else
-                set(interCon, 'XData', conjunction(:,1), 'YData', conjunction(:,2), 'ZData', conjunction(:,3));
+                set(interCon,'XData',conjunction(:,1),'YData',conjunction(:,2),'ZData',conjunction(:,3));
             end
         else
-            set(interCon, 'visible', 'off');
+            set(interCon,'visible','off');
         end
         
         % Построение объектов (препятствий) на графике
@@ -1100,6 +1268,17 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                 paralSurf{j,1}.Visible = 'on';
             end
         end
+        
+        % Построение помещения
+        roomSurf.Vertices = room.Points;
+        hold on;
+
+        % Построение сетки на стенах и потолке
+        set(gridWallNearPlot,'XData',gridCam.WallNear(:,1),'YData',gridCam.WallNear(:,2),'ZData',gridCam.WallNear(:,3));
+        set(gridWallLeftPlot,'XData',gridCam.WallLeft(:,1),'YData',gridCam.WallLeft(:,2),'ZData',gridCam.WallLeft(:,3));
+        set(gridWallFarPlot,'XData',gridCam.WallFar(:,1),'YData',gridCam.WallFar(:,2),'ZData',gridCam.WallFar(:,3));
+        set(gridWallRightPlot,'XData',gridCam.WallRight(:,1),'YData',gridCam.WallRight(:,2),'ZData',gridCam.WallRight(:,3));
+        set(gridRoofPlot,'XData',gridCam.Roof(:,1),'YData',gridCam.Roof(:,2),'ZData',gridCam.Roof(:,3));
 
         % Переопределение построенных frustum`ов
         if identFrustumCheck == 1
