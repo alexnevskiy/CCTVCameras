@@ -13,21 +13,22 @@ function TRInter = planeObjectIntersection(TR,X,V0)
     Surface1.faces = TR.ConnectivityList;
 
     lin = intersectPlaneSurf(Surface1,V0,X);
-    intersections = lin{1,1}.';
+    lin = cat(2,lin{:});
+    intersections = lin.';
     
     [mBoundary,~] = size(boundaryPoly);
     [mPoints,~] = size(points);
     [mIntersections,~] = size(intersections);
     ind = mPoints + 1;
     
-    points = [points; zeros(mIntersections - 1, 3)];
-    pointsAbovePlain = [pointsAbovePlain; true(mIntersections - 1, 1)];
+    points = [points; zeros(mIntersections, 3)];
+    pointsAbovePlain = [pointsAbovePlain; true(mIntersections, 1)];
     
     %% Поиск точек пересечения для самих полигонов
     % Рассматриваем каждый граничащий полигон и ищем точки, в которых он
     % пересекает плоскость. Для нахождения пересечения ребра полигона с
     % точкой используется функция collinear() из интернета, которая с
-    % заданной погрешностью вычисляет, лежат ли все поданые на вхож точки
+    % заданной погрешностью вычисляет, лежат ли все поданые на вход точки
     % на одной прямой или нет. Далее добавляем точки в массив points и
     % получаем их идентификаторы. Если вторая точка пересечения равна NaN,
     % то значит лишь одна точка лежит на плоскости, поэтому для создания
@@ -41,7 +42,7 @@ function TRInter = planeObjectIntersection(TR,X,V0)
 
         inter1 = NaN;
         inter2 = NaN;
-        for j = 1:mIntersections-1
+        for j = 1:mIntersections
             if collinear([first; intersections(j,:); second],1e-10)
                 if isnan(inter1)
                     inter1 = intersections(j,:);
@@ -98,35 +99,38 @@ function TRInter = planeObjectIntersection(TR,X,V0)
         thirdAbove = pointsAbovePlain(boundaryPoly(i,3),1);
         
         if firstAbove && secondAbove
-            if dot(first - second, inter1 - inter2) > 0
-                faces = [faces; ...
-                        [boundaryPoly(i,1) boundaryPoly(i,2) inter1Ind];...
-                        [boundaryPoly(i,2) inter1Ind inter2Ind]];
-            else
-                faces = [faces; ...
-                        [boundaryPoly(i,1) boundaryPoly(i,2) inter2Ind];...
-                        [boundaryPoly(i,2) inter1Ind inter2Ind]];
-            end
+            quadrilateral = [first;second;inter1;inter2];
+            indQ = [boundaryPoly(i,1);boundaryPoly(i,2);inter1Ind;inter2Ind];
+            quadrilateralMean = mean(quadrilateral,1);
+            [~,~,V] = svd(quadrilateral - quadrilateralMean,0);
+            quadrilateral2D = quadrilateral*V(:,1:2);
+            order = convhull(quadrilateral2D(:,1),quadrilateral2D(:,2));
+            
+            faces = [faces; ...
+                        [indQ(order(1)) indQ(order(2)) indQ(order(3))];...
+                        [indQ(order(1)) indQ(order(3)) indQ(order(4))]];
         elseif firstAbove && thirdAbove
-            if dot(first - third, inter1 - inter2) > 0
-                faces = [faces; ...
-                        [boundaryPoly(i,1) boundaryPoly(i,3) inter1Ind];...
-                        [boundaryPoly(i,3) inter1Ind inter2Ind]];
-            else
-                faces = [faces; ...
-                        [boundaryPoly(i,1) boundaryPoly(i,3) inter2Ind];...
-                        [boundaryPoly(i,3) inter1Ind inter2Ind]];
-            end
+            quadrilateral = [first;third;inter1;inter2];
+            indQ = [boundaryPoly(i,1);boundaryPoly(i,3);inter1Ind;inter2Ind];
+            quadrilateralMean = mean(quadrilateral,1);
+            [~,~,V] = svd(quadrilateral - quadrilateralMean,0);
+            quadrilateral2D = quadrilateral*V(:,1:2);
+            order = convhull(quadrilateral2D(:,1),quadrilateral2D(:,2));
+            
+            faces = [faces; ...
+                        [indQ(order(1)) indQ(order(2)) indQ(order(3))];...
+                        [indQ(order(1)) indQ(order(3)) indQ(order(4))]];
         elseif secondAbove && thirdAbove
-            if dot(second - third, inter1 - inter2) > 0
-                faces = [faces; ...
-                        [boundaryPoly(i,2) boundaryPoly(i,3) inter1Ind];...
-                        [boundaryPoly(i,3) inter1Ind inter2Ind]];
-            else
-                faces = [faces; ...
-                        [boundaryPoly(i,2) boundaryPoly(i,3) inter2Ind];...
-                        [boundaryPoly(i,3) inter1Ind inter2Ind]];
-            end
+            quadrilateral = [second;third;inter1;inter2];
+            indQ = [boundaryPoly(i,2);boundaryPoly(i,3);inter1Ind;inter2Ind];
+            quadrilateralMean = mean(quadrilateral,1);
+            [~,~,V] = svd(quadrilateral - quadrilateralMean,0);
+            quadrilateral2D = quadrilateral*V(:,1:2);
+            order = convhull(quadrilateral2D(:,1),quadrilateral2D(:,2));
+            
+            faces = [faces; ...
+                        [indQ(order(1)) indQ(order(2)) indQ(order(3))];...
+                        [indQ(order(1)) indQ(order(3)) indQ(order(4))]];
         elseif firstAbove
             faces = [faces; [boundaryPoly(i,1) inter1Ind inter2Ind]];
         elseif secondAbove

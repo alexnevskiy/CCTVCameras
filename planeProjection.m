@@ -7,7 +7,7 @@ function TRPlane = planeProjection(TR,X,V0,T,camPos,P1,P2)
         if check == 1
             planePoints(i,:) = I;
         else
-            if ((dot(I - camPos, T) > 0) && (check == 3))
+            if ((dot(I - camPos, T) >= 0) && (check == 3))
                 planePoints(i,:) = I;
             else
                 P3 = [P1(1,1), P1(1,2), P1(1,3) + 1];
