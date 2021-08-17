@@ -16,7 +16,7 @@ grid step 0.5
 5 6
 1 6
 -1 8
-camera position 0.1 1 4.5
+camera position 10 -3 4.5
 //
 // коробка
 //0 0
