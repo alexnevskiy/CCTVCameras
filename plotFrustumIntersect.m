@@ -8,18 +8,18 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     detectPPM = 25;
     monitorPPM = 12;
     
+    aspect = W / H;
+        
+    if fovH <= 0
+        fovH = fovV * aspect;
+    end
+
+    if fovV <= 0
+        fovV = fovH / aspect;
+    end
+    
     fovHTan = tan(fovH / 2 / 180 * pi);
     fovVTan = tan(fovV / 2 / 180 * pi);
-    
-    aspect = W / H;
-    
-    if (fovHTan <= 0)
-        fovHTan = fovVTan * aspect;
-    end
-    
-    if (fovVTan <= 0)
-        fovVTan = fovHTan / aspect;
-    end
 
     R = findRotationMatrix(pan,tilt,roll);      % Матрица поворота
     X = [0 0 1];                                % Вектор нормали (также просто ненулевой вектор)
@@ -113,16 +113,12 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     X1 = [0 0 heightLimit + 1];             % Вектор нормали плоскости
     
     % Определение плоскости допустимого ограничения по высоте для идентификации
-    V2 = [0 1 heightLimitIdent];                 % Любая точка на плоскости пола
-    X2 = [0 0 heightLimitIdent + 1];             % Вектор нормали плоскости
+    V2 = [0 1 heightLimitIdent];            % Любая точка на плоскости пола
+    X2 = [0 0 heightLimitIdent + 1];        % Вектор нормали плоскости
     
     % Нахождение точек пересечения полного frustum с плоскостью ограничения
     % по высоте
     planeInterLimit = planeFrustumIntersect(X1,V1,camPos,upRightMonitor,upLeftMonitor,downRightMonitor,downLeftMonitor);
-    
-%     % Нахождение точек пересечения полного frustum с плоскостью ограничения
-%     % допустимого ограничения по высоте для идентификации
-%     planeInterLimitIdent = planeFrustumIntersect(X2,V2,camPos,upRightMonitor,upLeftMonitor,downRightMonitor,downLeftMonitor);
     
     % Нахождение точек пересечения полного frustum с плоскостью пола
     planeInterFloor = planeFrustumIntersect(X,V0,camPos,upRightMonitor,upLeftMonitor,downRightMonitor,downLeftMonitor);
@@ -142,6 +138,9 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     
     floorPoly = polyshape(planeInterFloor(:,1:2));
     nearClipPlane = camPos + T * nearClipPlaneDist;
+    
+    X3 = X2;
+    V3 = V2;
 
     for i = 1:maxNumberOfObjects
         parallelepipeds{i,1} = getParallelepiped(i,i,i*2,[i*2 i*2 0]);
@@ -150,24 +149,24 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                 continue
             elseif isBehind(parallelepipeds{i,1},T,nearClipPlane,'any')
                     TRInterCamera = planeObjectIntersection(parallelepipeds{i,1},T,nearClipPlane);
-                if (isBehind(parallelepipeds{i,1},X2,V2,'full'))
+                if (isBehind(parallelepipeds{i,1},X3,V3,'full'))
                     continue
-                elseif (isBehind(parallelepipeds{i,1},X2,V2,'any'))
-                    TRInter = planeObjectIntersection(TRInterCamera,X2,V2);
-                    TRPlane = planeProjection(TRInter,X2,V2,T,camPos,upRightFar,upLeftFar);
+                elseif (isBehind(parallelepipeds{i,1},X3,V3,'any'))
+                    TRInter = planeObjectIntersection(TRInterCamera,X3,V3);
+                    TRPlane = planeProjection(TRInter,X3,V3,T,camPos,upRightFar,upLeftFar);
                 else
-                    TRPlane = planeProjection(TRInterCamera,X2,V2,T,camPos,upRightFar,upLeftFar);
+                    TRPlane = planeProjection(TRInterCamera,X3,V3,T,camPos,upRightFar,upLeftFar);
                 end
                 unPoly = unionPolygons(TRPlane);
                 floorPoly = subtract(floorPoly,unPoly);
             else
-                if (isBehind(parallelepipeds{i,1},X2,V2,'full'))
+                if (isBehind(parallelepipeds{i,1},X3,V3,'full'))
                     continue
-                elseif (isBehind(parallelepipeds{i,1},X2,V2,'any'))
-                    TRInter = planeObjectIntersection(parallelepipeds{i,1},X2,V2);
-                    TRPlane = planeProjection(TRInter,X2,V2,T,camPos,upRightFar,upLeftFar);
+                elseif (isBehind(parallelepipeds{i,1},X3,V3,'any'))
+                    TRInter = planeObjectIntersection(parallelepipeds{i,1},X3,V3);
+                    TRPlane = planeProjection(TRInter,X3,V3,T,camPos,upRightFar,upLeftFar);
                 else
-                    TRPlane = planeProjection(parallelepipeds{i,1},X2,V2,T,camPos,upRightFar,upLeftFar);
+                    TRPlane = planeProjection(parallelepipeds{i,1},X3,V3,T,camPos,upRightFar,upLeftFar);
                 end
                 unPoly = unionPolygons(TRPlane);
                 floorPoly = subtract(floorPoly,unPoly);
@@ -365,16 +364,6 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         set(interHeight,'visible','off');
     end
     
-%     % Если конъюнкция плоскостей - многоугольник, то строим её на графике
-%     [mCon, ~] = size(conjunction.Vertices);
-%     if (mCon < 3)
-%         interCon = plot(polyshape([0 0 0 0], [0 0 0 0]),'FaceColor',conColor);
-%         hold on
-%     else
-%         interCon = plot(conjunction,'FaceColor',conColor);
-%         hold on
-%     end
-    
     % Построение объектов (препятствий) на графике
     paralSurf = cell(maxNumberOfObjects,1);
     
@@ -548,6 +537,9 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                
     bInter = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54,130,23],...
                    'Value', 1, 'String', 'Visibility Area', 'Callback', {@update3DPointS});
+               
+    bBestLocation = uicontrol('Parent', f, 'Style', 'pushbutton', 'Position', [81*4+distH,54+distV/2,130,23],...
+                   'String', 'Best Camera Location', 'Callback', {@bestCameraLocation});
     
     bInterHeight = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+161,54-distV/2,130,23],...
                    'Value', 0, 'String', 'Height Intersection', 'Callback', {@update3DPointS});
@@ -999,19 +991,19 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         set(bRollText,'String',rollStr);
         
         camPos = [camPosX camPosY camPosZ];
-
-        fovHTan = tan(fovH / 2 / 180 * pi);
-        fovVTan = tan(fovV / 2 / 180 * pi);
         
         aspect = W / H;
         
-        if fovHTan <= 0
-            fovHTan = fovVTan * aspect;
+        if fovH <= 0
+            fovH = fovV * aspect;
         end
 
-        if fovVTan <= 0
-            fovVTan = fovHTan / aspect;
+        if fovV <= 0
+            fovV = fovH / aspect;
         end
+
+        fovHTan = tan(fovH / 2 / 180 * pi);
+        fovVTan = tan(fovV / 2 / 180 * pi);
         
         R = findRotationMatrix(pan,tilt,roll);
         pose = rigid3d(R,camPos);
@@ -1107,8 +1099,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         X1 = [0 0 heightLimit + 1];             % Вектор нормали плоскости
         
         % Определение плоскости допустимого ограничения по высоте для идентификации
-        V2 = [0 1 heightLimitIdent];                 % Любая точка на плоскости пола
-        X2 = [0 0 heightLimitIdent + 1];             % Вектор нормали плоскости
+        V2 = [0 1 heightLimitIdent];            % Любая точка на плоскости пола
+        X2 = [0 0 heightLimitIdent + 1];        % Вектор нормали плоскости
         
         % Нахождение точек пересечения полного frustum с плоскостью ограничения
         % по высоте
@@ -1425,19 +1417,6 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         else
             set(interHeight,'visible','off');
         end
-
-%         % Если конъюнкция плоскостей - многоугольник, то строим её на графике
-%         if conInterCheck == 1
-%             interCon.Visible = 'on';
-%             [mCon, ~] = size(conjunction.Vertices);
-%             if (mCon < 3)
-%                 interCon.Shape.Vertices = [];
-%             else
-%                 interCon.Shape.Vertices = conjunction.Vertices;
-%             end
-%         else
-%             interCon.Visible = 'off';
-%         end
         
         % Построение объектов (препятствий) на графике
         for j = 1:maxNumberOfObjects
@@ -1933,6 +1912,364 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                 set(bObjectWidth5T,'Visible','on');
                 set(bObjectDepth5T,'Visible','on');
                 set(bObjectHeight5T,'Visible','on');
+        end
+    end
+
+    function bestCameraLocation(~,~)
+        if (fovH >= 180)
+            possibleRotateH = 1;
+        else
+            possibleRotateH = 180 - fovH;
+        end
+
+        if (fovV >= 90)
+            possibleRotateV = 1;
+        else
+            possibleRotateV = 90 - fovV;
+        end 
+        
+        bestLocation = cell(5,1);
+
+        for m = 1:wallsCount
+            srartWall = wallsPts(roofPtsOrder(m,1),:);
+            endWall = wallsPts(roofPtsOrder(m,2),:);
+            wallDirect = endWall - srartWall;
+            angle = atan2d(wallDirect(1), wallDirect(2));   % Угол стены относительно Y
+            
+            F = faceNormal(room{m,1},1);
+            
+            [mGridPoints,~] = size(gridWalls{m,1});
+            
+            for g = 1:mGridPoints
+                if possibleRotateH == 1
+                    currentCamAngleH = angle - 90;
+                else
+                    currentCamAngleH = angle - possibleRotateH - fovH / 2;
+                end
+                
+                for h = 1:5:possibleRotateH
+                    if possibleRotateV == 1
+                        currentCamAngleV = 45;
+                    else
+                        currentCamAngleV = fovV / 2;
+                    end
+                    
+                    for v = 1:3:possibleRotateV
+                        fprintf("Прогресс: стена - %d, точка сетки - %d из %d доступных, " +...
+                            "вращение по горизонтали - %d из %d возможных, " +...
+                            "вращение по вертикали - %d из %d возможных\n",...
+                            m,g,mGridPoints,h,possibleRotateH,v,possibleRotateV);
+                        R1 = findRotationMatrix(currentCamAngleH,currentCamAngleV,0);
+                        
+                        camPos1 = gridWalls{m,1}(g,:) + F * camD;
+
+                        T1 = X * R1;                                % Вектор направления камеры
+
+                        identCenter1 = camPos1 + T1 * identDist;       % Центр основания frustum'a идентификации
+                        recogCenter1 = camPos1 + T1 * recogDist;       % Центр основания frustum'a распознования
+                        visibCenter1 = camPos1 + T1 * visibDist;       % Центр основания frustum'a обзора
+                        detectCenter1 = camPos1 + T1 * detectDist;     % Центр основания frustum'a детекции
+                        monitorCenter1 = camPos1 + T1 * monitorDist;   % Центр основания frustum'a мониторинга
+                        fcpCenter1 = camPos1 + T1 * farClipPlane;      % Центр основания дальнего frustum
+
+                        % Координаты точек основания frustum
+                        [upRightIdent1,upLeftIdent1,downRightIdent1,downLeftIdent1] = ...
+                            findFrustumBase(identCenter1,fovHTan,fovVTan,R1,identDist);
+                        [upRightRecog1,upLeftRecog1,downRightRecog1,downLeftRecog1] = ...
+                            findFrustumBase(recogCenter1,fovHTan,fovVTan,R1,recogDist);
+                        [upRightVisib1,upLeftVisib1,downRightVisib1,downLeftVisib1] = ...
+                            findFrustumBase(visibCenter1,fovHTan,fovVTan,R1,visibDist);
+                        [upRightDetect1,upLeftDetect1,downRightDetect1,downLeftDetect1] = ...
+                            findFrustumBase(detectCenter1,fovHTan,fovVTan,R1,detectDist);
+                        [upRightMonitor1,upLeftMonitor1,downRightMonitor1,downLeftMonitor1] = ...
+                            findFrustumBase(monitorCenter1,fovHTan,fovVTan,R1,monitorDist);
+                        [upRightFar1,upLeftFar1,~,~] = findFrustumBase(fcpCenter1,fovHTan,fovVTan,R1,farClipPlane);
+
+                        % Нахождение точек пересечения frustum с плоскостью пола
+                        planeInterIdent1 = planeFrustumIntersect(X,V0,camPos1,...
+                            upRightIdent1,upLeftIdent1,downRightIdent1,downLeftIdent1);
+                        planeInterRecog1 = planeTruncFrustumIntersect(X,V0,...
+                            upRightIdent1,upLeftIdent1,downRightIdent1,downLeftIdent1,...
+                            upRightRecog1,upLeftRecog1,downRightRecog1,downLeftRecog1);
+                        planeInterVisib1 = planeTruncFrustumIntersect(X,V0,...
+                            upRightRecog1,upLeftRecog1,downRightRecog1,downLeftRecog1,...
+                            upRightVisib1,upLeftVisib1,downRightVisib1,downLeftVisib1);
+                        planeInterDetect1 = planeTruncFrustumIntersect(X,V0,...
+                            upRightVisib1,upLeftVisib1,downRightVisib1,downLeftVisib1,...
+                            upRightDetect1,upLeftDetect1,downRightDetect1,downLeftDetect1);
+                        planeInterMonitor1 = planeTruncFrustumIntersect(X,V0,...
+                            upRightDetect1,upLeftDetect1,downRightDetect1,downLeftDetect1,...
+                            upRightMonitor1,upLeftMonitor1,downRightMonitor1,downLeftMonitor1);
+
+                        % Нахождение точек пересечения полного frustum с плоскостью ограничения
+                        % по высоте
+                        planeInterLimit1 = planeFrustumIntersect(X1,V1,camPos1,...
+                            upRightMonitor1,upLeftMonitor1,downRightMonitor1,downLeftMonitor1);
+
+                        % Нахождение точек пересечения полного frustum с плоскостью пола
+                        planeInterFloor1 = planeFrustumIntersect(X,V0,camPos1,...
+                            upRightMonitor1,upLeftMonitor1,downRightMonitor1,downLeftMonitor1);
+
+                        % Нахождения конъюнкции многоугольников на высоте ограничения и на полу
+                        conjunction1 = planesConjunction(planeInterLimit1,planeInterFloor1);
+
+                        % Создание объектов и нахождение слепых зон
+                        interIdentPoly1 = polyshape(planeInterIdent1(:,1:2));
+                        interRecogPoly1 = polyshape(planeInterRecog1(:,1:2));
+                        interVisibPoly1 = polyshape(planeInterVisib1(:,1:2));
+                        interDetectPoly1 = polyshape(planeInterDetect1(:,1:2));
+                        interMonitorPoly1 = polyshape(planeInterMonitor1(:,1:2));
+
+                        floorPoly1 = polyshape(planeInterFloor1(:,1:2));
+
+                        nearClipPlane1 = camPos1 + T1 * nearClipPlaneDist;
+
+                        for j = 1:maxNumberOfObjects
+                            X3 = X2;
+                            V3 = V2;
+                            if j <= numberOfObjects 
+                                if isBehind(parallelepipeds{j,1},T1,nearClipPlane1,'full')
+                                    continue
+                                elseif isBehind(parallelepipeds{j,1},T1,nearClipPlane1,'any')
+                                        TRInterCamera1 = planeObjectIntersection(parallelepipeds{j,1},T1,nearClipPlane1);
+                                    if (isBehind(parallelepipeds{j,1},X3,V3,'full'))
+                                        continue
+                                    elseif (isBehind(parallelepipeds{j,1},X3,V3,'any'))
+                                        TRInter1 = planeObjectIntersection(TRInterCamera1,X3,V3);
+                                        TRPlane1 = planeProjection(TRInter1,X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
+                                    else
+                                        TRPlane1 = planeProjection(TRInterCamera1,X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
+                                    end
+                                    unPoly1 = unionPolygons(TRPlane1);
+                                    floorPoly1 = subtract(floorPoly1,unPoly1);
+                                else
+                                    if (isBehind(parallelepipeds{j,1},X3,V3,'full'))
+                                        continue
+                                    elseif (isBehind(parallelepipeds{j,1},X3,V3,'any'))
+                                        TRInter1 = planeObjectIntersection(parallelepipeds{j,1},X3,V3);
+                                        TRPlane1 = planeProjection(TRInter1,X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
+                                    else
+                                        TRPlane1 = planeProjection(parallelepipeds{j,1},X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
+                                    end
+                                    unPoly1 = unionPolygons(TRPlane1);
+                                    floorPoly1 = subtract(floorPoly1,unPoly1);
+                                end
+                            end
+                        end
+
+                        for j = 1:wallsCount
+                            if isBehind(room{j,1},T1,nearClipPlane1,'full')
+                                continue
+                            elseif isBehind(room{j,1},T1,nearClipPlane1,'any')
+                                TRInterCamera1 = planeObjectIntersection(room{j,1},T1,nearClipPlane1);
+                                if (isBehind(room{j,1},X,V0,'full'))
+                                    continue
+                                elseif (isBehind(room{j,1},X,V0,'any'))
+                                    TRInter1 = planeObjectIntersection(TRInterCamera1,X,V0);
+                                    TRPlane1 = planeProjection(TRInter1,X,V0,T1,camPos1,upRightFar1,upLeftFar1);
+                                else
+                                    TRPlane1 = planeProjection(TRInterCamera1,X,V0,T1,camPos1,upRightFar1,upLeftFar1);
+                                end
+                                unPoly1 = unionPolygons(TRPlane1);
+                                floorPoly1 = subtract(floorPoly1,unPoly1);
+                            else
+                                if (isBehind(room{j,1},X,V0,'full'))
+                                    continue
+                                elseif (isBehind(room{j,1},X,V0,'any'))
+                                    TRInter1 = planeObjectIntersection(room{j,1},X,V0);
+                                    TRPlane1 = planeProjection(TRInter1,X,V0,T1,camPos1,upRightFar1,upLeftFar1);
+                                else
+                                    TRPlane1 = planeProjection(room{j,1},X,V0,T1,camPos1,upRightFar1,upLeftFar1);
+                                end
+                                unPoly1 = unionPolygons(TRPlane1);
+                                floorPoly1 = subtract(floorPoly1,unPoly1);
+                            end
+                        end
+
+                        % Удаление зоны видимости камеры снаружи помещения (не костыль)
+                        floorRoom1 = polyshape(wallsPts);
+                        floorPoly1 = intersect(floorPoly1,floorRoom1);
+                        
+                        floorPoly1 = intersect(floorPoly1,conjunction1);
+                        
+                        interIdentPoly1 = intersect(interIdentPoly1,floorPoly1);
+                        interRecogPoly1 = intersect(interRecogPoly1,floorPoly1);
+                        interVisibPoly1 = intersect(interVisibPoly1,floorPoly1);
+                        interDetectPoly1 = intersect(interDetectPoly1,floorPoly1);
+                        interMonitorPoly1 = intersect(interMonitorPoly1,floorPoly1);
+                        
+                        % Сохраняем все нужные данные для визуализации
+                        Location.area = area(floorPoly1);
+                        Location.camPos = camPos1;
+                        Location.frustumIdent = [upRightIdent1; upLeftIdent1; downLeftIdent1; downRightIdent1; camPos1];
+                        Location.frustumRecog = [upRightIdent1; upLeftIdent1; downLeftIdent1; downRightIdent1; ...
+                            upRightRecog1; upLeftRecog1; downLeftRecog1; downRightRecog1];
+                        Location.frustumVisib = [upRightRecog1; upLeftRecog1; downLeftRecog1; downRightRecog1; ...
+                            upRightVisib1; upLeftVisib1; downLeftVisib1; downRightVisib1];
+                        Location.frustumDetect = [upRightVisib1; upLeftVisib1; downLeftVisib1; downRightVisib1; ...
+                            upRightDetect1; upLeftDetect1; downLeftDetect1; downRightDetect1];
+                        Location.frustumMonitor = [upRightDetect1; upLeftDetect1; downLeftDetect1; downRightDetect1; ...
+                            upRightMonitor1; upLeftMonitor1; downLeftMonitor1; downRightMonitor1];
+                        if currentCamAngleH > 0
+                            Location.pan = currentCamAngleH;
+                        else
+                            Location.pan = 360 + currentCamAngleH;
+                        end
+                        Location.tilt = currentCamAngleV;
+                        Location.roll = 0;
+                        Location.interIdent = interIdentPoly1;
+                        Location.interRecog = interRecogPoly1;
+                        Location.interVisib = interVisibPoly1;
+                        Location.interDetect = interDetectPoly1;
+                        Location.interMonitor = interMonitorPoly1;
+                        
+                        empty = false;
+                        for b = 1:5   
+                            if isempty(bestLocation{b,1})
+                                bestLocation{b,1} = Location;
+                                empty = true;
+                                break;
+                            elseif Location.area >= bestLocation{b,1}.area
+                                break;
+                            end
+                        end
+                        
+                        if ~empty
+                            switch b
+                                case 1
+                                    bestLocation{5,1} = bestLocation{4,1};
+                                    bestLocation{4,1} = bestLocation{3,1};
+                                    bestLocation{3,1} = bestLocation{2,1};
+                                    bestLocation{2,1} = bestLocation{1,1};
+                                    bestLocation{1,1} = Location;
+                                case 2
+                                    bestLocation{5,1} = bestLocation{4,1};
+                                    bestLocation{4,1} = bestLocation{3,1};
+                                    bestLocation{3,1} = bestLocation{2,1};
+                                    bestLocation{2,1} = Location;
+                                case 3
+                                    bestLocation{5,1} = bestLocation{4,1};
+                                    bestLocation{4,1} = bestLocation{3,1};
+                                    bestLocation{3,1} = Location;
+                                case 4
+                                    bestLocation{5,1} = bestLocation{4,1};
+                                    bestLocation{4,1} = Location;
+                                case 5
+                                    bestLocation{5,1} = Location;
+                            end
+                        end
+                            
+                        currentCamAngleV = currentCamAngleV + 1;
+                    end
+                    currentCamAngleH = currentCamAngleH + 1;
+                end
+            end
+        end
+        
+        camPos = bestLocation{1,1}.camPos;
+        PIdent = bestLocation{1,1}.frustumIdent;
+        PRecog = bestLocation{1,1}.frustumRecog;
+        PVisib = bestLocation{1,1}.frustumVisib;
+        PDetect = bestLocation{1,1}.frustumDetect;
+        PMonitor = bestLocation{1,1}.frustumMonitor;
+        pan = bestLocation{1,1}.pan;
+        tilt = bestLocation{1,1}.tilt;
+        roll = bestLocation{1,1}.roll;
+        interIdentPoly = bestLocation{1,1}.interIdent;
+        interRecogPoly = bestLocation{1,1}.interRecog;
+        interVisibPoly = bestLocation{1,1}.interVisib;
+        interDetectPoly = bestLocation{1,1}.interDetect;
+        interMonitorPoly = bestLocation{1,1}.interMonitor;
+        
+        set(bCamPosX,'String',camPos(1,1));
+        set(bCamPosY,'String',camPos(1,2));
+        set(bCamPosZ,'String',camPos(1,3));
+        
+        R = findRotationMatrix(pan,tilt,roll);
+        pose = rigid3d(R,camPos);
+        cam.AbsolutePose = pose;
+
+        set(bPan,'Value',pan);
+        set(bTilt,'Value',tilt);
+        set(bRoll,'Value',roll);
+        panStr = "Pan " + pan;
+        tiltStr = "Tilt " + tilt;
+        rollStr = "Roll (unused) " + roll;
+        set(bPanText,'String',panStr);
+        set(bTiltText,'String',tiltStr);
+        set(bRollText,'String',rollStr);
+
+        set(frustumUpIdent, 'XData', PIdent(indUpF, 1), 'YData', PIdent(indUpF, 2), 'ZData', PIdent(indUpF, 3));
+        set(frustumLeftIdent, 'XData', PIdent(indLeftF, 1), 'YData', PIdent(indLeftF, 2), 'ZData', PIdent(indLeftF, 3));
+        set(frustumDownIdent, 'XData', PIdent(indDownF, 1), 'YData', PIdent(indDownF, 2), 'ZData', PIdent(indDownF, 3));
+        set(frustumRightIdent, 'XData', PIdent(indRightF, 1), 'YData', PIdent(indRightF, 2), 'ZData', PIdent(indRightF, 3));
+
+        set(frustumUpRecog, 'XData', PRecog(indUp, 1), 'YData', PRecog(indUp, 2), 'ZData', PRecog(indUp, 3));
+        set(frustumLeftRecog, 'XData', PRecog(indLeft, 1), 'YData', PRecog(indLeft, 2), 'ZData', PRecog(indLeft, 3));
+        set(frustumDownRecog, 'XData', PRecog(indDown, 1), 'YData', PRecog(indDown, 2), 'ZData', PRecog(indDown, 3));
+        set(frustumRightRecog, 'XData', PRecog(indRight, 1), 'YData', PRecog(indRight, 2), 'ZData', PRecog(indRight, 3));
+
+        set(frustumUpVisib, 'XData', PVisib(indUp, 1), 'YData', PVisib(indUp, 2), 'ZData', PVisib(indUp, 3));
+        set(frustumLeftVisib, 'XData', PVisib(indLeft, 1), 'YData', PVisib(indLeft, 2), 'ZData', PVisib(indLeft, 3));
+        set(frustumDownVisib, 'XData', PVisib(indDown, 1), 'YData', PVisib(indDown, 2), 'ZData', PVisib(indDown, 3));
+        set(frustumRightVisib, 'XData', PVisib(indRight, 1), 'YData', PVisib(indRight, 2), 'ZData', PVisib(indRight, 3));
+
+        set(frustumUpDetect, 'XData', PDetect(indUp, 1), 'YData', PDetect(indUp, 2), 'ZData', PDetect(indUp, 3));
+        set(frustumLeftDetect, 'XData', PDetect(indLeft, 1), 'YData', PDetect(indLeft, 2), 'ZData', PDetect(indLeft, 3));
+        set(frustumDownDetect, 'XData', PDetect(indDown, 1), 'YData', PDetect(indDown, 2), 'ZData', PDetect(indDown, 3));
+        set(frustumRightDetect, 'XData', PDetect(indRight, 1), 'YData', PDetect(indRight, 2), 'ZData', PDetect(indRight, 3));
+
+        set(frustumUpMonitor, 'XData', PMonitor(indUp, 1), 'YData', PMonitor(indUp, 2), 'ZData', PMonitor(indUp, 3));
+        set(frustumLeftMonitor, 'XData', PMonitor(indLeft, 1), 'YData', PMonitor(indLeft, 2), 'ZData', PMonitor(indLeft, 3));
+        set(frustumDownMonitor, 'XData', PMonitor(indDown, 1), 'YData', PMonitor(indDown, 2), 'ZData', PMonitor(indDown, 3));
+        set(frustumRightMonitor, 'XData', PMonitor(indRight, 1), 'YData', PMonitor(indRight, 2), 'ZData', PMonitor(indRight, 3));
+        
+        [mIdent, ~] = size(interIdentPoly.Vertices);
+        if (mIdent < 3)
+            interIdent.Shape.Vertices = [];
+        else
+            interIdent.Shape.Vertices = interIdentPoly.Vertices;
+        end
+
+        [mRecog, ~] = size(interRecogPoly.Vertices);
+        if (mRecog < 3)
+            interRecog.Shape.Vertices = [];
+        else
+            interRecog.Shape.Vertices = interRecogPoly.Vertices;
+        end
+
+        [mVisib, ~] = size(interVisibPoly.Vertices);
+        if (mVisib < 3)
+            interVisib.Shape.Vertices = [];
+        else
+            interVisib.Shape.Vertices = interVisibPoly.Vertices;
+        end
+
+        [mDetect, ~] = size(interDetectPoly.Vertices);
+        if (mDetect < 3)
+            interDetect.Shape.Vertices = [];
+        else
+            interDetect.Shape.Vertices = interDetectPoly.Vertices;
+        end
+
+        [mMonitor, ~] = size(interMonitorPoly.Vertices);
+        if (mMonitor < 3)
+            interMonitor.Shape.Vertices = [];
+        else
+            interMonitor.Shape.Vertices = interMonitorPoly.Vertices;
+        end
+        
+        for j = 1:5
+            disp(["Топ ", j, ":"]);
+            disp(["Площадь покрытия: ",bestLocation{j,1}.area]);
+            disp("Позиция камеры:");
+            disp(bestLocation{j,1}.camPos);
+            disp("Pan:");
+            disp(bestLocation{j,1}.pan);
+            disp("Tilt:");
+            disp(bestLocation{j,1}.tilt);
+            disp("Roll:");
+            disp(bestLocation{j,1}.roll);
         end
     end
 end
