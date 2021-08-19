@@ -422,13 +422,15 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     
     % Построение помещения
     roomPlot = cell(wallsCount + 1,1);
+    quiverPlot = cell(wallsCount + 1,1);
     for i = 1:wallsCount+1
         roomPlot{i,1} = trisurf(room{i,1},'FaceColor',paintRoomColor,'LineWidth',2);
         
         P1 = incenter(room{i,1});
         F1 = faceNormal(room{i,1});
-        quiver3(P1(:,1),P1(:,2),P1(:,3), ...
+        quiverPlot{i,1} = quiver3(P1(:,1),P1(:,2),P1(:,3), ...
             F1(:,1),F1(:,2),F1(:,3),0.5,'color','r');
+        set(quiverPlot{i,1},'Visible','off');
         hold on;
     end
     
@@ -545,6 +547,9 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                
     bBestLocation = uicontrol('Parent', f, 'Style', 'pushbutton', 'Position', [81*4+distH,54+distV/2,130,23],...
                    'String', 'Best Camera Location', 'Callback', {@bestCameraLocation});
+               
+    bNormals = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV,130,23],...
+                   'Value', 0, 'String', 'Normals', 'Callback', {@update3DPointS});
     
     bInterHeight = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+161,54-distV/2,130,23],...
                    'Value', 0, 'String', 'Height Intersection', 'Callback', {@update3DPointS});
@@ -976,6 +981,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         cutRoomCheck = get(bCutRoom,'Value');
         paintRoomCheck = get(bPaintRoom,'Value');
         interCheck = get(bInter,'Value');
+        normalsCheck = get(bNormals,'Value');
         heightInterCheck = get(bInterHeight,'Value');
         heightLimitInterCheck = get(bHeightLimitInter,'Value');
         interLimitIdentCheck = get(bInterLimitIdent,'Value');
@@ -1438,6 +1444,17 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         for j = 1:wallsCount + 1
             roomPlot{j,1}.Vertices = room{j,1}.Points;
             roomPlot{j,1}.Faces = room{j,1}.ConnectivityList;
+            
+            P1 = incenter(room{j,1});
+            F1 = faceNormal(room{j,1});
+            set(quiverPlot{j,1},'XData',P1(:,1),'YData',P1(:,2),'ZData',P1(:,3),...
+                'UData',F1(:,1),'VData',F1(:,2),'WData',F1(:,3));
+            if normalsCheck
+                set(quiverPlot{j,1},'Visible','on');
+            else
+                set(quiverPlot{j,1},'Visible','off');
+            end
+            
             if paintRoomCheck
                 roomPlot{j,1}.FaceColor = paintRoomColor;
             else
@@ -2052,7 +2069,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                                     if (isBehind(TRInterCamera1,X3,V3,'full'))
                                         continue
                                     elseif (isBehind(TRInterCamera1,X3,V3,'any'))
-                                        TRInter1 = planeObjectIntersection(TRInterCamera1,X3,V3);
+%                                         TRInter1 = planeObjectIntersection(TRInterCamera1,X3,V3);
+                                        TRInter1 = liftParallelepipedBase(TRInterCamera1,V3);
                                         TRPlane1 = planeProjection(TRInter1,X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
                                     else
                                         TRPlane1 = planeProjection(TRInterCamera1,X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
@@ -2063,7 +2081,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                                     if (isBehind(parallelepipeds{j,1},X3,V3,'full'))
                                         continue
                                     elseif (isBehind(parallelepipeds{j,1},X3,V3,'any'))
-                                        TRInter1 = planeObjectIntersection(parallelepipeds{j,1},X3,V3);
+%                                         TRInter1 = planeObjectIntersection(parallelepipeds{j,1},X3,V3);
+                                        TRInter1 = liftParallelepipedBase(parallelepipeds{j,1},V3);
                                         TRPlane1 = planeProjection(TRInter1,X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
                                     else
                                         TRPlane1 = planeProjection(parallelepipeds{j,1},X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
