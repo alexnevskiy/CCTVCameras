@@ -424,6 +424,11 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     roomPlot = cell(wallsCount + 1,1);
     for i = 1:wallsCount+1
         roomPlot{i,1} = trisurf(room{i,1},'FaceColor',paintRoomColor,'LineWidth',2);
+        
+        P1 = incenter(room{i,1});
+        F1 = faceNormal(room{i,1});
+        quiver3(P1(:,1),P1(:,2),P1(:,3), ...
+            F1(:,1),F1(:,2),F1(:,3),0.5,'color','r');
         hold on;
     end
     
