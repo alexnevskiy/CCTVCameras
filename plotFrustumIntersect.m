@@ -548,8 +548,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     bBestLocation = uicontrol('Parent', f, 'Style', 'pushbutton', 'Position', [81*4+distH,54+distV/2,130,23],...
                    'String', 'Best Camera Location', 'Callback', {@bestCameraLocation});
                
-    bNormals = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV,130,23],...
-                   'Value', 0, 'String', 'Normals', 'Callback', {@update3DPointS});
+    bSimpleAlgorithm = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54+distV,130,23],...
+                   'Value', 1, 'String', 'Simplified Algorithm');
     
     bInterHeight = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+161,54-distV/2,130,23],...
                    'Value', 0, 'String', 'Height Intersection', 'Callback', {@update3DPointS});
@@ -559,6 +559,9 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                
     bInterLimitIdent = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+161,54+distV/2,130,23],...
                    'Value', 1, 'String', 'Identity Height Limit', 'Callback', {@update3DPointS});
+               
+    bNormals = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH+161,54+distV,130,23],...
+                   'Value', 0, 'String', 'Normals', 'Callback', {@update3DPointS});
     
     bGridRoom = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81,54+distV*5/2,130,23],...
                    'Value', 1, 'String', 'Grid Room', 'Callback', {@update3DPointS});
@@ -1938,6 +1941,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     end
 
     function bestCameraLocation(~,~)
+        simpleAlgorithm = get(bSimpleAlgorithm,'Value');
+        
         if (fovH >= 180)
             possibleRotateH = 1;
         else
@@ -1955,6 +1960,29 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         fprintf("Диапазон по горизонтали - %d, диапазон по вертикали - %d\n",...
                 possibleRotateH,possibleRotateV);
 
+        tFrustum = 0;                   % Время нахождения координат точек основания frustum
+        tPlaneInter = 0;                % Время нахождения точек пересечения frustum с плоскостью пола
+        tFrustumCount = 0;              % Счётчик для frustum
+        tInterCameraP = 0;              % Время разрезания объекта плоскостью камеры
+        tInterCameraPCount = 0;         % Счётчик для tInterCameraP
+        tInterCameraW = 0;              % Время разрезания стены плоскостью камеры
+        tInterCameraWCount = 0;         % Счётчик для tInterCameraW
+        tHeightLimitSimple = 0;         % Время разрезания объекта плоскостью ограничения идентификации (простой)
+        tHeightLimitSimpleCount = 0;    % Счётчик для tHeightLimitSimple
+        tHeightLimit = 0;               % Время разрезания объекта плоскостью ограничения идентификации (универсальный)
+        tHeightLimitCount = 0;          % Счётчик для tHeightLimitSimple
+        tPlaneProjectP = 0;             % Время проекции объекта на плоскость
+        tPlaneProjectPCount = 0;        % Счётчик для tPlaneProjectP
+        tUnionPolygons = 0;             % Время объединения полигонов на полу
+        tUnionPolygonsCount = 0;        % Счётчик для tUnionPolygons
+        tPlaneProjectW = 0;             % Время проекции стены на плоскость
+        tPlaneProjectWCount = 0;        % Счётчик для tPlaneProjectW
+        tInterPoly = 0;                 % Время вписывания всех зон видимости в комнату 
+        tInterPolyCount = 0;            % Счётчик для tInterPoly
+        tLocation = 0;                  % Время создания конструкции для хранения данных
+        tLocationCount = 0;             % Счётчик для tLocation
+        tStart = tic;                   % Начальное включения работы всего алгоритма
+        
         for m = 1:wallsCount
             disp('======================================================');
             disp(['Стена № ', num2str(m)]);
@@ -2006,6 +2034,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         monitorCenter1 = camPos1 + T1 * monitorDist;   % Центр основания frustum'a мониторинга
                         fcpCenter1 = camPos1 + T1 * farClipPlane;      % Центр основания дальнего frustum
 
+                        tFrustumStart = tic;
                         % Координаты точек основания frustum
                         [upRightIdent1,upLeftIdent1,downRightIdent1,downLeftIdent1] = ...
                             findFrustumBase(identCenter1,fovHTan,fovVTan,R1,identDist);
@@ -2018,7 +2047,9 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         [upRightMonitor1,upLeftMonitor1,downRightMonitor1,downLeftMonitor1] = ...
                             findFrustumBase(monitorCenter1,fovHTan,fovVTan,R1,monitorDist);
                         [upRightFar1,upLeftFar1,~,~] = findFrustumBase(fcpCenter1,fovHTan,fovVTan,R1,farClipPlane);
+                        tFrustum = tFrustum + toc(tFrustumStart);
 
+                        tPlaneInterStart = tic;
                         % Нахождение точек пересечения frustum с плоскостью пола
                         planeInterIdent1 = planeFrustumIntersect(X,V0,camPos1,...
                             upRightIdent1,upLeftIdent1,downRightIdent1,downLeftIdent1);
@@ -2034,7 +2065,9 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         planeInterMonitor1 = planeTruncFrustumIntersect(X,V0,...
                             upRightDetect1,upLeftDetect1,downRightDetect1,downLeftDetect1,...
                             upRightMonitor1,upLeftMonitor1,downRightMonitor1,downLeftMonitor1);
-
+                        tPlaneInter = tPlaneInter + toc(tPlaneInterStart);
+                        tFrustumCount = tFrustumCount + 1;
+                        
                         % Нахождение точек пересечения полного frustum с плоскостью ограничения
                         % по высоте
                         planeInterLimit1 = planeFrustumIntersect(X1,V1,camPos1,...
@@ -2065,29 +2098,68 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                                 if isBehind(parallelepipeds{j,1},T1,nearClipPlane1,'full')
                                     continue
                                 elseif isBehind(parallelepipeds{j,1},T1,nearClipPlane1,'any')
-                                        TRInterCamera1 = planeObjectIntersection(parallelepipeds{j,1},T1,nearClipPlane1);
+                                    tInterCameraPStart = tic;
+                                    TRInterCamera1 = planeObjectIntersection(parallelepipeds{j,1},T1,nearClipPlane1);
+                                    tInterCameraP = tInterCameraP + toc(tInterCameraPStart);
+                                    tInterCameraPCount = tInterCameraPCount + 1;
                                     if (isBehind(TRInterCamera1,X3,V3,'full'))
                                         continue
                                     elseif (isBehind(TRInterCamera1,X3,V3,'any'))
-%                                         TRInter1 = planeObjectIntersection(TRInterCamera1,X3,V3);
-                                        TRInter1 = liftParallelepipedBase(TRInterCamera1,V3);
+                                        if simpleAlgorithm
+                                            tHeightLimitSimpleStart = tic;
+                                            TRInter1 = liftParallelepipedBase(TRInterCamera1,V3);
+                                            tHeightLimitSimple = tHeightLimitSimple + toc(tHeightLimitSimpleStart);
+                                            tHeightLimitSimpleCount = tHeightLimitSimpleCount + 1;
+                                        else
+                                            tHeightLimitStart = tic;
+                                            TRInter1 = planeObjectIntersection(TRInterCamera1,X3,V3);
+                                            tHeightLimit = tHeightLimit + toc(tHeightLimitStart);
+                                            tHeightLimitCount = tHeightLimitCount + 1;
+                                        end
+                                        tPlaneProjectPStart = tic;
                                         TRPlane1 = planeProjection(TRInter1,X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
+                                        tPlaneProjectP = tPlaneProjectP + toc(tPlaneProjectPStart);
+                                        tPlaneProjectPCount = tPlaneProjectPCount + 1;
                                     else
+                                        tPlaneProjectPStart = tic;
                                         TRPlane1 = planeProjection(TRInterCamera1,X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
+                                        tPlaneProjectP = tPlaneProjectP + toc(tPlaneProjectPStart);
+                                        tPlaneProjectPCount = tPlaneProjectPCount + 1;
                                     end
+                                    tUnionPolygonsStart = tic;
                                     unPoly1 = unionPolygons(TRPlane1);
+                                    tUnionPolygons = tUnionPolygons + toc(tUnionPolygonsStart);
+                                    tUnionPolygonsCount = tUnionPolygonsCount + 1;
                                     floorPoly1 = subtract(floorPoly1,unPoly1);
                                 else
                                     if (isBehind(parallelepipeds{j,1},X3,V3,'full'))
                                         continue
                                     elseif (isBehind(parallelepipeds{j,1},X3,V3,'any'))
-%                                         TRInter1 = planeObjectIntersection(parallelepipeds{j,1},X3,V3);
-                                        TRInter1 = liftParallelepipedBase(parallelepipeds{j,1},V3);
+                                        if simpleAlgorithm
+                                            tHeightLimitSimpleStart = tic;
+                                            TRInter1 = liftParallelepipedBase(parallelepipeds{j,1},V3);
+                                            tHeightLimitSimple = tHeightLimitSimple + toc(tHeightLimitSimpleStart);
+                                            tHeightLimitSimpleCount = tHeightLimitSimpleCount + 1;
+                                        else
+                                            tHeightLimitStart = tic;
+                                            TRInter1 = planeObjectIntersection(parallelepipeds{j,1},X3,V3);
+                                            tHeightLimit = tHeightLimit + toc(tHeightLimitStart);
+                                            tHeightLimitCount = tHeightLimitCount + 1;
+                                        end
+                                        tPlaneProjectPStart = tic;
                                         TRPlane1 = planeProjection(TRInter1,X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
+                                        tPlaneProjectP = tPlaneProjectP + toc(tPlaneProjectPStart);
+                                        tPlaneProjectPCount = tPlaneProjectPCount + 1;
                                     else
+                                        tPlaneProjectPStart = tic;
                                         TRPlane1 = planeProjection(parallelepipeds{j,1},X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
+                                        tPlaneProjectP = tPlaneProjectP + toc(tPlaneProjectPStart);
+                                        tPlaneProjectPCount = tPlaneProjectPCount + 1;
                                     end
+                                    tUnionPolygonsStart = tic;
                                     unPoly1 = unionPolygons(TRPlane1);
+                                    tUnionPolygons = tUnionPolygons + toc(tUnionPolygonsStart);
+                                    tUnionPolygonsCount = tUnionPolygonsCount + 1;
                                     floorPoly1 = subtract(floorPoly1,unPoly1);
                                 end
                             end
@@ -2097,16 +2169,25 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                             if isBehind(room{j,1},T1,nearClipPlane1,'full')
                                 continue
                             elseif isBehind(room{j,1},T1,nearClipPlane1,'any')
+                                tInterCameraWStart = tic;
                                 TRInterCamera1 = planeObjectIntersection(room{j,1},T1,nearClipPlane1);
+                                tInterCameraW = tInterCameraW + toc(tInterCameraWStart);
+                                tInterCameraWCount = tInterCameraWCount + 1;
                                 if (isBehind(room{j,1},X,V0,'full'))
                                     continue
                                 elseif (isBehind(room{j,1},X,V0,'any'))
                                     TRInter1 = planeObjectIntersection(TRInterCamera1,X,V0);
                                     TRPlane1 = planeProjection(TRInter1,X,V0,T1,camPos1,upRightFar1,upLeftFar1);
                                 else
+                                    tPlaneProjectWStart = tic;
                                     TRPlane1 = planeProjection(TRInterCamera1,X,V0,T1,camPos1,upRightFar1,upLeftFar1);
+                                    tPlaneProjectW = tPlaneProjectW + toc(tPlaneProjectWStart);
+                                    tPlaneProjectWCount = tPlaneProjectWCount + 1;
                                 end
+                                tUnionPolygonsStart = tic;
                                 unPoly1 = unionPolygons(TRPlane1);
+                                tUnionPolygons = tUnionPolygons + toc(tUnionPolygonsStart);
+                                tUnionPolygonsCount = tUnionPolygonsCount + 1;
                                 floorPoly1 = subtract(floorPoly1,unPoly1);
                             else
                                 if (isBehind(room{j,1},X,V0,'full'))
@@ -2115,9 +2196,15 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                                     TRInter1 = planeObjectIntersection(room{j,1},X,V0);
                                     TRPlane1 = planeProjection(TRInter1,X,V0,T1,camPos1,upRightFar1,upLeftFar1);
                                 else
+                                    tPlaneProjectWStart = tic;
                                     TRPlane1 = planeProjection(room{j,1},X,V0,T1,camPos1,upRightFar1,upLeftFar1);
+                                    tPlaneProjectW = tPlaneProjectW + toc(tPlaneProjectWStart);
+                                    tPlaneProjectWCount = tPlaneProjectWCount + 1;
                                 end
+                                tUnionPolygonsStart = tic;
                                 unPoly1 = unionPolygons(TRPlane1);
+                                tUnionPolygons = tUnionPolygons + toc(tUnionPolygonsStart);
+                                tUnionPolygonsCount = tUnionPolygonsCount + 1;
                                 floorPoly1 = subtract(floorPoly1,unPoly1);
                             end
                         end
@@ -2128,12 +2215,16 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         
                         floorPoly1 = intersect(floorPoly1,conjunction1);
                         
+                        tInterPolyStart = tic;
                         interIdentPoly1 = intersect(interIdentPoly1,floorPoly1);
                         interRecogPoly1 = intersect(interRecogPoly1,floorPoly1);
                         interVisibPoly1 = intersect(interVisibPoly1,floorPoly1);
                         interDetectPoly1 = intersect(interDetectPoly1,floorPoly1);
                         interMonitorPoly1 = intersect(interMonitorPoly1,floorPoly1);
+                        tInterPoly = tInterPoly + toc(tInterPolyStart);
+                        tInterPolyCount = tInterPolyCount + 1;
                         
+                        tLocationStart = tic;
                         % Сохраняем все нужные данные для визуализации
                         Location.area = area(floorPoly1);
                         Location.camPos = camPos1;
@@ -2158,6 +2249,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         Location.interVisib = interVisibPoly1;
                         Location.interDetect = interDetectPoly1;
                         Location.interMonitor = interMonitorPoly1;
+                        tLocation = tLocation + toc(tLocationStart);
+                        tLocationCount = tLocationCount + 1;
                         
                         if isempty(bestLocalLocation{g,1}) || ...
                                 Location.area >= bestLocalLocation{g,1}.area
@@ -2322,5 +2415,50 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             disp(['Tilt: ',num2str(bestLocation{j,1}.tilt)]);
             disp(['Roll: ',num2str(bestLocation{j,1}.roll)]);
         end
+        
+        tEnd = toc(tStart);
+        
+        tFrustum = tFrustum / tFrustumCount;
+        tPlaneInter = tPlaneInter / tFrustumCount;
+        tInterCameraP = tInterCameraP / tInterCameraPCount;
+        tInterCameraW = tInterCameraW / tInterCameraWCount;
+        tHeightLimitSimple = tHeightLimitSimple / tHeightLimitSimpleCount;
+        tHeightLimit = tHeightLimit / tHeightLimitCount;
+        tPlaneProjectP = tPlaneProjectP / tPlaneProjectPCount;
+        tUnionPolygons = tUnionPolygons / tUnionPolygonsCount;
+        tPlaneProjectW = tPlaneProjectW / tPlaneProjectWCount;
+        tInterPoly = tInterPoly / tInterPolyCount;
+        tLocation = tLocation / tLocationCount;
+        
+        disp('======================================================');
+        disp('Время выполнения (в секундах)');
+        disp('======================================================');
+        disp(['Нахождение координат точек основания frustum: ',...
+            num2str(tFrustum)]);
+        disp(['Нахождение точек пересечения frustum с плоскостью пола: ',...
+            num2str(tPlaneInter)]);
+        disp(['Разрезание объекта (parallelepiped) плоскостью камеры (nearClipPlane): ',...
+            num2str(tInterCameraP)]);
+        disp(['Разрезание стены (wall) плоскостью камеры (nearClipPlane): ',...
+            num2str(tInterCameraW)]);
+        if simpleAlgorithm
+            disp(['Разрезание объекта плоскостью ограничения идентификации (простой): ',...
+                num2str(tHeightLimitSimple)]);
+        else
+            disp(['Разрезание объекта плоскостью ограничения идентификации (универсальный): ',...
+                num2str(tHeightLimit)]);
+        end
+        disp(['Проекция объекта (parallelepiped) на плоскость: ',...
+            num2str(tPlaneProjectP)]);
+        disp(['Проекция стены (wall) на плоскость: ',...
+            num2str(tPlaneProjectW)]);
+        disp(['Объединение полигонов на полу: ',...
+            num2str(tUnionPolygons)]);
+        disp(['Вписывание всех зон видимости в комнату: ',...
+            num2str(tInterPoly)]);
+        disp(['Создание конструкции для хранения данных: ',...
+            num2str(tLocation)]);
+        disp(['Общее время выполнения: ',...
+            num2str(tEnd)]);
     end
 end
