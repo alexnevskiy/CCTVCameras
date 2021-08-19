@@ -149,9 +149,9 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                 continue
             elseif isBehind(parallelepipeds{i,1},T,nearClipPlane,'any')
                     TRInterCamera = planeObjectIntersection(parallelepipeds{i,1},T,nearClipPlane);
-                if (isBehind(parallelepipeds{i,1},X3,V3,'full'))
+                if (isBehind(TRInterCamera,X3,V3,'full'))
                     continue
-                elseif (isBehind(parallelepipeds{i,1},X3,V3,'any'))
+                elseif (isBehind(TRInterCamera,X3,V3,'any'))
                     TRInter = planeObjectIntersection(TRInterCamera,X3,V3);
                     TRPlane = planeProjection(TRInter,X3,V3,T,camPos,upRightFar,upLeftFar);
                 else
@@ -1181,9 +1181,9 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                     continue
                 elseif isBehind(parallelepipeds{j,1},T,nearClipPlane,'any')
                         TRInterCamera = planeObjectIntersection(parallelepipeds{j,1},T,nearClipPlane);
-                    if (isBehind(parallelepipeds{j,1},X3,V3,'full'))
+                    if (isBehind(TRInterCamera,X3,V3,'full'))
                         continue
-                    elseif (isBehind(parallelepipeds{j,1},X3,V3,'any'))
+                    elseif (isBehind(TRInterCamera,X3,V3,'any'))
                         TRInter = planeObjectIntersection(TRInterCamera,X3,V3);
                         TRPlane = planeProjection(TRInter,X3,V3,T,camPos,upRightFar,upLeftFar);
                     else
@@ -2049,9 +2049,9 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                                     continue
                                 elseif isBehind(parallelepipeds{j,1},T1,nearClipPlane1,'any')
                                         TRInterCamera1 = planeObjectIntersection(parallelepipeds{j,1},T1,nearClipPlane1);
-                                    if (isBehind(parallelepipeds{j,1},X3,V3,'full'))
+                                    if (isBehind(TRInterCamera1,X3,V3,'full'))
                                         continue
-                                    elseif (isBehind(parallelepipeds{j,1},X3,V3,'any'))
+                                    elseif (isBehind(TRInterCamera1,X3,V3,'any'))
                                         TRInter1 = planeObjectIntersection(TRInterCamera1,X3,V3);
                                         TRPlane1 = planeProjection(TRInter1,X3,V3,T1,camPos1,upRightFar1,upLeftFar1);
                                     else
