@@ -1929,8 +1929,15 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         end 
         
         bestLocation = cell(5,1);
+        
+        fprintf("Диапазон по горизонтали - %d, диапазон по вертикали - %d\n",...
+                possibleRotateH,possibleRotateV);
 
         for m = 1:wallsCount
+            disp('======================================================');
+            disp(['Стена № ', num2str(m)]);
+            disp('======================================================');
+            
             srartWall = wallsPts(roofPtsOrder(m,1),:);
             endWall = wallsPts(roofPtsOrder(m,2),:);
             wallDirect = endWall - srartWall;
@@ -1939,6 +1946,11 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             F = faceNormal(room{m,1},1);
             
             [mGridPoints,~] = size(gridWalls{m,1});
+                        
+            bestLocalLocation = cell(mGridPoints,1);
+            
+            stepH = 5;
+            stepV = 3;
             
             for g = 1:mGridPoints
                 if possibleRotateH == 1
@@ -1947,18 +1959,18 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                     currentCamAngleH = angle - possibleRotateH - fovH / 2;
                 end
                 
-                for h = 1:5:possibleRotateH
+                for h = 1:stepH:possibleRotateH
                     if possibleRotateV == 1
                         currentCamAngleV = 45;
                     else
                         currentCamAngleV = fovV / 2;
                     end
                     
-                    for v = 1:3:possibleRotateV
-                        fprintf("Прогресс: стена - %d, точка сетки - %d из %d доступных, " +...
-                            "вращение по горизонтали - %d из %d возможных, " +...
-                            "вращение по вертикали - %d из %d возможных\n",...
-                            m,g,mGridPoints,h,possibleRotateH,v,possibleRotateV);
+                    for v = 1:stepV:possibleRotateV
+%                         fprintf("Прогресс: стена - %d, точка сетки - %d из %d доступных, " +...
+%                             "вращение по горизонтали - %d из %d возможных, " +...
+%                             "вращение по вертикали - %d из %d возможных\n",...
+%                             m,g,mGridPoints,h,possibleRotateH,v,possibleRotateV);
                         R1 = findRotationMatrix(currentCamAngleH,currentCamAngleV,0);
                         
                         camPos1 = gridWalls{m,1}(g,:) + F * camD;
@@ -2123,6 +2135,11 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         Location.interDetect = interDetectPoly1;
                         Location.interMonitor = interMonitorPoly1;
                         
+                        if isempty(bestLocalLocation{g,1}) || ...
+                                Location.area >= bestLocalLocation{g,1}.area
+                            bestLocalLocation{g,1} = Location;
+                        end
+                        
                         empty = false;
                         for b = 1:5   
                             if isempty(bestLocation{b,1})
@@ -2159,10 +2176,18 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                             end
                         end
                             
-                        currentCamAngleV = currentCamAngleV + 1;
+                        currentCamAngleV = currentCamAngleV + stepV;
                     end
-                    currentCamAngleH = currentCamAngleH + 1;
+                    
+                    currentCamAngleH = currentCamAngleH + stepH;
                 end
+                
+                disp(['Площадь покрытия для лучшей позиции ',num2str(g),' точки: ',num2str(bestLocalLocation{g,1}.area)]);
+                disp("Позиция камеры:");
+                disp(bestLocalLocation{g,1}.camPos);
+                disp(['Pan: ',num2str(bestLocalLocation{g,1}.pan)]);
+                disp(['Tilt: ',num2str(bestLocalLocation{g,1}.tilt)]);
+                disp(['Roll: ',num2str(bestLocalLocation{g,1}.roll)]);
             end
         end
         
@@ -2261,15 +2286,12 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         
         for j = 1:5
             disp(["Топ ", j, ":"]);
-            disp(["Площадь покрытия: ",bestLocation{j,1}.area]);
+            disp(['Площадь покрытия: ',num2str(bestLocation{j,1}.area)]);
             disp("Позиция камеры:");
             disp(bestLocation{j,1}.camPos);
-            disp("Pan:");
-            disp(bestLocation{j,1}.pan);
-            disp("Tilt:");
-            disp(bestLocation{j,1}.tilt);
-            disp("Roll:");
-            disp(bestLocation{j,1}.roll);
+            disp(['Pan: ',num2str(bestLocation{g,1}.pan)]);
+            disp(['Tilt: ',num2str(bestLocation{g,1}.tilt)]);
+            disp(['Roll: ',num2str(bestLocation{g,1}.roll)]);
         end
     end
 end
