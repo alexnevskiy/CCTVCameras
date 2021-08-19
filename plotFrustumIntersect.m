@@ -2141,17 +2141,20 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         end
                         
                         empty = false;
+                        compare = false;
                         for b = 1:5   
                             if isempty(bestLocation{b,1})
                                 bestLocation{b,1} = Location;
                                 empty = true;
+                                compare = true;
                                 break;
                             elseif Location.area >= bestLocation{b,1}.area
+                                compare = true;
                                 break;
                             end
                         end
                         
-                        if ~empty
+                        if ~empty && compare
                             switch b
                                 case 1
                                     bestLocation{5,1} = bestLocation{4,1};
@@ -2285,13 +2288,15 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         end
         
         for j = 1:5
-            disp(["Топ ", j, ":"]);
+            disp('======================================================');
+            disp(['Топ ', num2str(j), ':']);
+            disp('======================================================');
             disp(['Площадь покрытия: ',num2str(bestLocation{j,1}.area)]);
             disp("Позиция камеры:");
             disp(bestLocation{j,1}.camPos);
-            disp(['Pan: ',num2str(bestLocation{g,1}.pan)]);
-            disp(['Tilt: ',num2str(bestLocation{g,1}.tilt)]);
-            disp(['Roll: ',num2str(bestLocation{g,1}.roll)]);
+            disp(['Pan: ',num2str(bestLocation{j,1}.pan)]);
+            disp(['Tilt: ',num2str(bestLocation{j,1}.tilt)]);
+            disp(['Roll: ',num2str(bestLocation{j,1}.roll)]);
         end
     end
 end
