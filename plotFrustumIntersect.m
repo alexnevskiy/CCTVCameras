@@ -1284,10 +1284,17 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         gridWalls = cell(wallsCount,1);
         wallAvailableH = roomH - (2 * camH + heightLimit);
         pointsNumberH = floor(wallAvailableH / gridStep);
+        if pointsNumberH == 0 && gridStep > wallAvailableH
+            pointsNumberH = 1;
+        end
 
         pointsH = zeros(pointsNumberH,1);
         for j = 1:pointsNumberH         % Общие координаты точек сетки по Z
-            pointsH(j,1) = camH + heightLimit + gridStep * j;
+            if pointsNumberH == 1
+                pointsH(j,1) = camH + heightLimit + wallAvailableH / 2;
+            else
+                pointsH(j,1) = camH + heightLimit + gridStep * j;
+            end
         end
 
         % Расчёт сетки точек для стен
@@ -1295,7 +1302,10 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             wallW = roomSize(j,1);                              % Ширина стены
             wallAvailableW = wallW - 2 * camW;                  % Доступная часть стены
             pointsNumberW = floor(wallAvailableW / gridStep);   % Количество точек сетки
-
+            if pointsNumberW == 0 && gridStep > wallAvailableW
+                pointsNumberW = 1;
+            end
+            
             startPoint = wallsPts(roofPtsOrder(j,1),:);         % Начальная координата стены
             endPoint = wallsPts(roofPtsOrder(j,2),:);           % Конечная координата стены
             direction = endPoint - startPoint;                  % Вектор стены
@@ -1304,7 +1314,11 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
 
             pointsW = zeros(pointsNumberW,2);                   % Точки сетки по ширине
             for m = 1:pointsNumberW
-                pointsW(m,:) = camWScaled + directionScaled * gridStep * m;
+                if pointsNumberW == 1
+                    pointsW(m,:) = camWScaled + directionScaled * (wallAvailableW / 2);
+                else
+                    pointsW(m,:) = camWScaled + directionScaled * gridStep * m;
+                end
             end
 
             gridWall = cell(pointsNumberH,1);                   % Точки сетки по высоте
@@ -1327,6 +1341,13 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         roofAvailableD = roofD - 2 * camW;
         roofPointsNumberW = floor(roofAvailableW / gridStep);
         roofPointsNumberD = floor(roofAvailableD / gridStep);
+        
+        if roofPointsNumberW == 0 && gridStep > roofAvailableW
+            roofPointsNumberW = 1;
+        end
+        if roofPointsNumberD == 0 && gridStep > roofAvailableD
+            roofPointsNumberD = 1;
+        end
 
         roofDirectionW = roofStartPointD - roofStartPointW;     % Вектор одной стороны описанного прямоугольника 
         roofDirectionD = roofEndPointD - roofStartPointD;       % Вектор другой стороны описанного прямоугольника 
@@ -1338,13 +1359,21 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         gridRoof = zeros(roofPointsNumberW * roofPointsNumberD,2);
 
         for j = 1:roofPointsNumberW
-            roofPointsW(j,:) = roofCamWScaled + roofDirectionWScaled * gridStep * j;
+            if roofPointsNumberW == 1
+                roofPointsW(j,:) = roofCamWScaled + roofDirectionWScaled * (roofAvailableW / 2);
+            else
+                roofPointsW(j,:) = roofCamWScaled + roofDirectionWScaled * gridStep * j;
+            end
         end
 
         for j = 1:roofPointsNumberW
             roofCamDScaled = roofPointsW(j,:) + roofDirectionDScaled * camW;
             for m = 1:roofPointsNumberD
-                gridRoof((j - 1) * roofPointsNumberD + m,:) = roofCamDScaled + roofDirectionDScaled * gridStep * m;
+                if roofPointsNumberD == 1
+                    gridRoof((j - 1) * roofPointsNumberD + m,:) = roofCamDScaled + roofDirectionDScaled * (roofAvailableD / 2);
+                else
+                    gridRoof((j - 1) * roofPointsNumberD + m,:) = roofCamDScaled + roofDirectionDScaled * gridStep * m;
+                end
             end
         end
 
@@ -1985,10 +2014,6 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         tStart = tic;                   % Начальное включения работы всего алгоритма
         
         parfor m = 1:wallsCount
-            disp('======================================================');
-            disp(['Стена № ', num2str(m)]);
-            disp('======================================================');
-            
             bestWallLocation = cell(5,1);
             
             srartWall = wallsPts(roofPtsOrder(m,1),:);
@@ -1999,8 +2024,6 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             F = faceNormal(room{m,1},1);
             
             [mGridPoints,~] = size(gridWalls{m,1});
-                        
-            bestLocalLocation = cell(mGridPoints,1);
             
             stepH = 5;
             stepV = 3;
@@ -2020,10 +2043,6 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                     end
                     
                     for v = 1:stepV:possibleRotateV
-%                         fprintf("Прогресс: стена - %d, точка сетки - %d из %d доступных, " +...
-%                             "вращение по горизонтали - %d из %d возможных, " +...
-%                             "вращение по вертикали - %d из %d возможных\n",...
-%                             m,g,mGridPoints,h,possibleRotateH,v,possibleRotateV);
                         R1 = findRotationMatrix(currentCamAngleH,currentCamAngleV,0);
                         
                         camPos1 = gridWalls{m,1}(g,:) + F * camD;
@@ -2256,11 +2275,6 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         tLocation = tLocation + toc(tLocationStart);
                         tLocationCount = tLocationCount + 1;
                         
-                        if isempty(bestLocalLocation{g,1}) || ...
-                                Location.area >= bestLocalLocation{g,1}.area
-                            bestLocalLocation{g,1} = Location;
-                        end
-                        
                         empty = false;
                         compare = false;
                         for b = 1:5   
@@ -2304,13 +2318,6 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                     
                     currentCamAngleH = currentCamAngleH + stepH;
                 end
-                
-                disp(['Площадь покрытия для лучшей позиции ',num2str(g),' точки: ',num2str(bestLocalLocation{g,1}.area)]);
-                disp("Позиция камеры:");
-                disp(bestLocalLocation{g,1}.camPos);
-                disp(['Pan: ',num2str(bestLocalLocation{g,1}.pan)]);
-                disp(['Tilt: ',num2str(bestLocalLocation{g,1}.tilt)]);
-                disp(['Roll: ',num2str(bestLocalLocation{g,1}.roll)]);
             end
             
             bestWallsLocation{m,1} = bestWallLocation;
