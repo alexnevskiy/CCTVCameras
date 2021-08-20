@@ -24,7 +24,7 @@ function [points,faces,boundaryPoly,pointsAbovePlain] = cutObject(TR,X,V0)
     % относительно плоскости.
     
     for i = 1:mPoints
-        if dot(TR.Points(i,:) - V0, X) >= 0
+        if dot(points(i,:) - V0, X) >= 0
             pointsAbovePlain(i,1) = true;
         end  
     end

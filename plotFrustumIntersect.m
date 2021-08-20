@@ -1956,6 +1956,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         end 
         
         bestLocation = cell(5,1);
+        bestWallsLocation = cell(wallsCount,1);
         
         fprintf("Диапазон по горизонтали - %d, диапазон по вертикали - %d\n",...
                 possibleRotateH,possibleRotateV);
@@ -1983,10 +1984,12 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         tLocationCount = 0;             % Счётчик для tLocation
         tStart = tic;                   % Начальное включения работы всего алгоритма
         
-        for m = 1:wallsCount
+        parfor m = 1:wallsCount
             disp('======================================================');
             disp(['Стена № ', num2str(m)]);
             disp('======================================================');
+            
+            bestWallLocation = cell(5,1);
             
             srartWall = wallsPts(roofPtsOrder(m,1),:);
             endWall = wallsPts(roofPtsOrder(m,2),:);
@@ -2025,14 +2028,14 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         
                         camPos1 = gridWalls{m,1}(g,:) + F * camD;
 
-                        T1 = X * R1;                                % Вектор направления камеры
+                        T1 = X * R1;                                    % Вектор направления камеры
 
-                        identCenter1 = camPos1 + T1 * identDist;       % Центр основания frustum'a идентификации
-                        recogCenter1 = camPos1 + T1 * recogDist;       % Центр основания frustum'a распознования
-                        visibCenter1 = camPos1 + T1 * visibDist;       % Центр основания frustum'a обзора
-                        detectCenter1 = camPos1 + T1 * detectDist;     % Центр основания frustum'a детекции
-                        monitorCenter1 = camPos1 + T1 * monitorDist;   % Центр основания frustum'a мониторинга
-                        fcpCenter1 = camPos1 + T1 * farClipPlane;      % Центр основания дальнего frustum
+                        identCenter1 = camPos1 + T1 * identDist;        % Центр основания frustum'a идентификации
+                        recogCenter1 = camPos1 + T1 * recogDist;        % Центр основания frustum'a распознования
+                        visibCenter1 = camPos1 + T1 * visibDist;        % Центр основания frustum'a обзора
+                        detectCenter1 = camPos1 + T1 * detectDist;      % Центр основания frustum'a детекции
+                        monitorCenter1 = camPos1 + T1 * monitorDist;    % Центр основания frustum'a мониторинга
+                        fcpCenter1 = camPos1 + T1 * farClipPlane;       % Центр основания дальнего frustum
 
                         tFrustumStart = tic;
                         % Координаты точек основания frustum
@@ -2226,6 +2229,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         
                         tLocationStart = tic;
                         % Сохраняем все нужные данные для визуализации
+                        Location = struct;
                         Location.area = area(floorPoly1);
                         Location.camPos = camPos1;
                         Location.frustumIdent = [upRightIdent1; upLeftIdent1; downLeftIdent1; downRightIdent1; camPos1];
@@ -2260,12 +2264,11 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         empty = false;
                         compare = false;
                         for b = 1:5   
-                            if isempty(bestLocation{b,1})
-                                bestLocation{b,1} = Location;
+                            if isempty(bestWallLocation{b,1})
+                                bestWallLocation{b,1} = Location;
                                 empty = true;
-                                compare = true;
                                 break;
-                            elseif Location.area >= bestLocation{b,1}.area
+                            elseif Location.area >= bestWallLocation{b,1}.area
                                 compare = true;
                                 break;
                             end
@@ -2274,25 +2277,25 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         if ~empty && compare
                             switch b
                                 case 1
-                                    bestLocation{5,1} = bestLocation{4,1};
-                                    bestLocation{4,1} = bestLocation{3,1};
-                                    bestLocation{3,1} = bestLocation{2,1};
-                                    bestLocation{2,1} = bestLocation{1,1};
-                                    bestLocation{1,1} = Location;
+                                    bestWallLocation{5,1} = bestWallLocation{4,1};
+                                    bestWallLocation{4,1} = bestWallLocation{3,1};
+                                    bestWallLocation{3,1} = bestWallLocation{2,1};
+                                    bestWallLocation{2,1} = bestWallLocation{1,1};
+                                    bestWallLocation{1,1} = Location;
                                 case 2
-                                    bestLocation{5,1} = bestLocation{4,1};
-                                    bestLocation{4,1} = bestLocation{3,1};
-                                    bestLocation{3,1} = bestLocation{2,1};
-                                    bestLocation{2,1} = Location;
+                                    bestWallLocation{5,1} = bestWallLocation{4,1};
+                                    bestWallLocation{4,1} = bestWallLocation{3,1};
+                                    bestWallLocation{3,1} = bestWallLocation{2,1};
+                                    bestWallLocation{2,1} = Location;
                                 case 3
-                                    bestLocation{5,1} = bestLocation{4,1};
-                                    bestLocation{4,1} = bestLocation{3,1};
-                                    bestLocation{3,1} = Location;
+                                    bestWallLocation{5,1} = bestWallLocation{4,1};
+                                    bestWallLocation{4,1} = bestWallLocation{3,1};
+                                    bestWallLocation{3,1} = Location;
                                 case 4
-                                    bestLocation{5,1} = bestLocation{4,1};
-                                    bestLocation{4,1} = Location;
+                                    bestWallLocation{5,1} = bestWallLocation{4,1};
+                                    bestWallLocation{4,1} = Location;
                                 case 5
-                                    bestLocation{5,1} = Location;
+                                    bestWallLocation{5,1} = Location;
                             end
                         end
                             
@@ -2308,6 +2311,50 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                 disp(['Pan: ',num2str(bestLocalLocation{g,1}.pan)]);
                 disp(['Tilt: ',num2str(bestLocalLocation{g,1}.tilt)]);
                 disp(['Roll: ',num2str(bestLocalLocation{g,1}.roll)]);
+            end
+            
+            bestWallsLocation{m,1} = bestWallLocation;
+        end
+        
+        for m = 1:wallsCount
+            empty = false;
+            compare = false;
+            for a = 1:5
+                for b = 1:5   
+                    if isempty(bestLocation{b,1})
+                        bestLocation{b,1} = bestWallsLocation{m,1}{a,1};
+                        empty = true;
+                        break;
+                    elseif bestWallsLocation{m,1}{a,1}.area >= bestLocation{b,1}.area
+                        compare = true;
+                        break;
+                    end
+                end
+
+                if ~empty && compare
+                    switch b
+                        case 1
+                            bestLocation{5,1} = bestLocation{4,1};
+                            bestLocation{4,1} = bestLocation{3,1};
+                            bestLocation{3,1} = bestLocation{2,1};
+                            bestLocation{2,1} = bestLocation{1,1};
+                            bestLocation{1,1} = bestWallsLocation{m,1}{a,1};
+                        case 2
+                            bestLocation{5,1} = bestLocation{4,1};
+                            bestLocation{4,1} = bestLocation{3,1};
+                            bestLocation{3,1} = bestLocation{2,1};
+                            bestLocation{2,1} = bestWallsLocation{m,1}{a,1};
+                        case 3
+                            bestLocation{5,1} = bestLocation{4,1};
+                            bestLocation{4,1} = bestLocation{3,1};
+                            bestLocation{3,1} = bestWallsLocation{m,1}{a,1};
+                        case 4
+                            bestLocation{5,1} = bestLocation{4,1};
+                            bestLocation{4,1} = bestWallsLocation{m,1}{a,1};
+                        case 5
+                            bestLocation{5,1} = bestWallsLocation{m,1}{a,1};
+                    end
+                end
             end
         end
         
