@@ -309,7 +309,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     % графике (вместе со слепыми зонами)
     [mIdent, ~] = size(interIdentPoly.Vertices);
     if (mIdent < 3)
-        interIdent = plot(polyshape([0 0 0 0], [0 0 0 0]),'FaceColor',identColor);
+        interIdent = plot(polyshape(),'FaceColor',identColor);
         hold on
     else
         interIdent = plot(interIdentPoly,'FaceColor',identColor);
@@ -318,7 +318,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     
     [mRecog, ~] = size(interRecogPoly.Vertices);
     if (mRecog < 3)
-        interRecog = plot(polyshape([0 0 0 0], [0 0 0 0]),'FaceColor',recogColor);
+        interRecog = plot(polyshape(),'FaceColor',recogColor);
         hold on
     else
         interRecog = plot(interRecogPoly,'FaceColor',recogColor);
@@ -327,7 +327,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     
     [mVisib, ~] = size(interVisibPoly.Vertices);
     if (mVisib < 3)
-        interVisib = plot(polyshape([0 0 0 0], [0 0 0 0]),'FaceColor',visibColor);
+        interVisib = plot(polyshape(),'FaceColor',visibColor);
         hold on
     else
         interVisib = plot(interVisibPoly,'FaceColor',visibColor);
@@ -336,7 +336,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     
     [mDetect, ~] = size(interDetectPoly.Vertices);
     if (mDetect < 3)
-        interDetect = plot(polyshape([0 0 0 0], [0 0 0 0]),'FaceColor',detectColor);
+        interDetect = plot(polyshape(),'FaceColor',detectColor);
         hold on
     else
         interDetect = plot(interDetectPoly,'FaceColor',detectColor);
@@ -345,7 +345,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     
     [mMonitor, ~] = size(interMonitorPoly.Vertices);
     if (mMonitor < 3)
-        interMonitor = plot(polyshape([0 0 0 0], [0 0 0 0]),'FaceColor',monitorColor);
+        interMonitor = plot(polyshape(),'FaceColor',monitorColor);
         hold on
     else
         interMonitor = plot(interMonitorPoly,'FaceColor',monitorColor);

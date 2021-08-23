@@ -15,6 +15,7 @@ function TRInter = planeObjectIntersection(TR,X,V0)
     lin = intersectPlaneSurf(Surface1,V0,X);
     lin = cat(2,lin{:});
     intersections = lin.';
+    intersections = unique(intersections,'rows','stable');
     
     [mBoundary,~] = size(boundaryPoly);
     [mPoints,~] = size(points);
@@ -43,21 +44,21 @@ function TRInter = planeObjectIntersection(TR,X,V0)
         inter1 = NaN;
         inter2 = NaN;
         for j = 1:mIntersections
-            if collinear([first; intersections(j,:); second],1e-10)
+            if pointOnSegment(first,second,intersections(j,:),1e-10)
                 if isnan(inter1)
                     inter1 = intersections(j,:);
                 else
                     inter2 = intersections(j,:);
                     break
                 end
-            elseif collinear([first; intersections(j,:); third],1e-10)
+            elseif pointOnSegment(first,third,intersections(j,:),1e-10)
                 if isnan(inter1)
                     inter1 = intersections(j,:);
                 else
                     inter2 = intersections(j,:);
                     break
                 end
-            elseif collinear([second; intersections(j,:); third],1e-10)
+            elseif pointOnSegment(second,third,intersections(j,:),1e-10)
                 if isnan(inter1)
                     inter1 = intersections(j,:);
                 else
