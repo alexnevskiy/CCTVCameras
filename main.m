@@ -10,7 +10,7 @@ roll = 0;                   % Угол поворота вокруг оси Y
 fovH = 93;                  % Угол обзора по горизонтали
 fovV = 51;                  % Угол обзора по вертикали
 farClipPlane = 10000;       % Расстояние от камеры до дальней плоскости отсечения по оси Z
-[roomH,gridStep,wallsPts,camPos] = loadRoom('room.txt'); % Параметры помещения и положения камеры
+[roomH,gridStep,wallsPts,doorsSpec,windowsSpec,camPos] = loadRoom('room.txt'); % Параметры помещения и положения камеры
 heightLimit = 2;            % Ограничение по высоте
 heightLimitIdent = 0.5;     % Допустимое ограничение по высоте для идентификации
 numberOfObjects = 0;        % Количество объектов (максимум 5)
@@ -21,4 +21,4 @@ nearClipPlaneDist = 1e-1;   % Расстояние до ближней плос�
 
 plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     farClipPlane,camPos,heightLimit,heightLimitIdent,numberOfObjects,...
-    wallsPts,roomH,gridStep,camW,camD,camH,nearClipPlaneDist)
+    wallsPts,roomH,doorsSpec,windowsSpec,gridStep,camW,camD,camH,nearClipPlaneDist)

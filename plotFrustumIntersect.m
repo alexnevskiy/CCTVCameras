@@ -1,6 +1,6 @@
 function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     farClipPlane,camPos,heightLimit,heightLimitIdent,numberOfObjects,...
-    wallsPts,roomH,gridStep,camW,camD,camH,nearClipPlaneDist)
+    wallsPts,roomH,doorsSpec,windowsSpec,gridStep,camW,camD,camH,nearClipPlaneDist)
 
     identPPM = 250;
     recogPPM = 125;
@@ -96,6 +96,49 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     tri = DT(isInside, :);          % Получить индексы точек внутренних треугольников
     roof = triangulation(tri,[wallsPts ones(wallsCount,1) * roomH]);
     room{wallsCount + 1,1} = roof;
+    
+    [doorsCount,~] = size(doorsSpec);
+    doors = cell(doorsCount,1);                     % Создание дверей
+    doorhandles = cell(doorsCount,1);               % Создание дверных ручек
+    doorhandlesSpec = cell(doorsCount,1);         % Задание углов дверных ручек
+    for i = 1:doorsCount
+        wallNumber = doorsSpec(i).WallNumber;
+        startPoint = wallsPts(roofPtsOrder(wallNumber,1),:);    % Начальная координата стены
+        endPoint = wallsPts(roofPtsOrder(wallNumber,2),:);      % Конечная координата стены
+        direction = endPoint - startPoint;                      % Вектор стены
+        directionScaled = direction/norm(direction);            % Вектор длиной 1
+        
+        doorStart = startPoint + directionScaled * doorsSpec(i).DistanceToDoor;
+        doorEnd = doorStart + directionScaled * doorsSpec(i).DoorWidth;
+        door = getWall(doorStart,doorEnd,doorsSpec(i).DoorHeight);
+        
+        F2 = faceNormal(room{wallNumber,1},1);
+        F2 = [F2(1,1) F2(1,2)];
+        doorhandlesPos = doorStart + directionScaled * ...
+            (doorsSpec(i).DoorWidth - doorsSpec(i).DoorWidth / 5) + F2 * 0.1;
+        doorhandlesSpec{i,1}.Pos = [doorhandlesPos doorsSpec(i).DoorHeight / 2 - 0.05];
+        doorhandlesSpec{i,1}.Angle = atan2d(direction(1), direction(2));   % Угол стены относительно Y
+        doorhandle = getParallelepiped(doorsSpec(i).DoorWidth / 10,0.2,0.1,doorhandlesSpec{i,1}.Pos);
+        
+        doors{i,1} = door;
+        doorhandles{i,1} = doorhandle;
+    end
+    
+    [windowsCount,~] = size(windowsSpec);
+    windows = cell(windowsCount,1);             % Создание окон
+    for i = 1:windowsCount
+        wallNumber = windowsSpec(i).WallNumber;
+        startPoint = wallsPts(roofPtsOrder(wallNumber,1),:);    % Начальная координата стены
+        endPoint = wallsPts(roofPtsOrder(wallNumber,2),:);      % Конечная координата стены
+        direction = endPoint - startPoint;                      % Вектор стены
+        directionScaled = direction/norm(direction);            % Вектор длиной 1
+        
+        windowStart = startPoint + directionScaled * windowsSpec(i).DistanceToWindow;
+        windowEnd = windowStart + directionScaled * windowsSpec(i).WindowWidth;
+        window = getWall(windowStart,windowEnd,windowsSpec(i).WindowHeight,windowsSpec(i).FloorDistance);
+        
+        windows{i,1} = window;
+    end
 
     % Нахождение точек пересечения frustum'ов с плоскостью пола
     planeInterIdent = planeFrustumIntersect(X,V0,camPos,upRightIdent,upLeftIdent,downRightIdent,downLeftIdent);
@@ -304,6 +347,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     paralColor = 'magenta';
     gridColor = [0 0.4470 0.7410];
     paintRoomColor = 'green';
+    paintDoorsColor = 'black';
+    paintWindowsColor = 'yellow';
 
     % Если рёбра frustum пересекают плоскость пола, то строим пересечение на
     % графике (вместе со слепыми зонами)
@@ -432,6 +477,31 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             F1(:,1),F1(:,2),F1(:,3),0.5,'color','r');
         set(quiverPlot{i,1},'Visible','off');
         hold on;
+    end
+    
+    % Построение дверей
+    doorsPlot = cell(doorsCount,1);
+    doorhandlesPlot = cell(doorsCount,1);
+    quiverDoorsPlot = cell(doorsCount,1);
+    for i = 1:doorsCount
+        doorsPlot{i,1} = trisurf(doors{i,1},'FaceColor',paintDoorsColor,'LineWidth',2);
+        doorhandlesPlot{i,1} = trisurf(doorhandles{i,1},'FaceColor',paintDoorsColor,'LineWidth',2);
+        rotate(doorhandlesPlot{i,1},[0 0 1],doorhandlesSpec{i,1}.Angle,doorhandlesSpec{i,1}.Pos);
+        
+        P1 = incenter(doors{i,1},1);
+        F1 = faceNormal(room{doorsSpec(i).WallNumber,1},1);
+        if strcmp(doorsSpec(i).WhereOpen,'outside')
+            F1 = -F1;
+        end
+        quiverDoorsPlot{i,1} = quiver3(P1(:,1),P1(:,2),P1(:,3), ...
+            F1(:,1),F1(:,2),F1(:,3),1.5,'color','black','LineWidth',1);
+        hold on;
+    end
+    
+    % Построение окон
+    windowsPlot = cell(windowsCount,1);
+    for i = 1:windowsCount
+        windowsPlot{i,1} = trisurf(windows{i,1},'FaceColor',paintWindowsColor,'LineWidth',2);
     end
     
     % Построение сетки на стенах и потолке
