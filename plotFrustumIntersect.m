@@ -114,11 +114,15 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         
         F2 = faceNormal(room{wallNumber,1},1);
         F2 = [F2(1,1) F2(1,2)];
-        doorhandlesPos = doorStart + directionScaled * ...
-            (doorsSpec(i).DoorWidth - doorsSpec(i).DoorWidth / 5) + F2 * 0.1;
+        if strcmp(doorsSpec(i).Doorhandle,'back')
+            distanceToDoorhandle = doorsSpec(i).DoorWidth / 5;
+        else
+            distanceToDoorhandle = doorsSpec(i).DoorWidth - doorsSpec(i).DoorWidth / 5;
+        end
+        doorhandlesPos = doorStart + directionScaled * distanceToDoorhandle + F2 * 0.1;
         doorhandlesSpec{i,1}.Pos = [doorhandlesPos doorsSpec(i).DoorHeight / 2 - 0.05];
-        doorhandlesSpec{i,1}.Angle = atan2d(direction(1), direction(2));   % Угол стены относительно Y
-        doorhandle = getParallelepiped(doorsSpec(i).DoorWidth / 10,0.2,0.1,doorhandlesSpec{i,1}.Pos);
+        doorhandlesSpec{i,1}.Angle = 360 - atan2d(direction(1), direction(2));   % Угол стены относительно Y
+        doorhandle = getParallelepiped(0.2,doorsSpec(i).DoorWidth / 10,0.1,doorhandlesSpec{i,1}.Pos);
         
         doors{i,1} = door;
         doorhandles{i,1} = doorhandle;

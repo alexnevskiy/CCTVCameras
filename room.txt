@@ -36,6 +36,7 @@ wall coordinates
 doors
 1 5 1.2 2.5 back inside
 3 2 1.2 2.5 front outside
+5 4 1.2 2.5 back inside
 windows
 1 10 5 2.5 0.5
 2 4 10 2.5 0.5
