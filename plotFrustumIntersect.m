@@ -297,6 +297,36 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         gridWalls{i,1} = cat(1,gridWall{:});
     end
     
+    for i = 1:wallsCount
+        for n = 1:doorsCount
+            if doorsSpec(n).WallNumber == i
+                FV.faces = doors{n,1}.ConnectivityList;
+                FV.vertices = doors{n,1}.Points;
+                distances = point2trimesh(FV,'QueryPoints',gridWalls{i,1});
+                [mGridWall,~] = size(gridWalls{i,1});
+                for p = mGridWall:-1:1
+                    if abs(distances(p,1)) <= camW
+                        gridWalls{i,1}(p,:) = [];
+                    end
+                end
+            end
+        end
+        
+        for n = 1:windowsCount
+            if windowsSpec(n).WallNumber == i
+                FV.faces = windows{n,1}.ConnectivityList;
+                FV.vertices = windows{n,1}.Points;
+                distances = point2trimesh(FV,'QueryPoints',gridWalls{i,1});
+                [mGridWall,~] = size(gridWalls{i,1});
+                for p = mGridWall:-1:1
+                    if abs(distances(p,1)) <= camW
+                        gridWalls{i,1}(p,:) = [];
+                    end
+                end
+            end
+        end
+    end
+    
     % Расчёт сетки точек для потолка
     [rectX,rectY] = minBoundRect(wallsPts(:,1),wallsPts(:,2));  % Описание помещения прямоугольником
     roofStartPointW = [rectX(1,1) rectY(1,1)];
@@ -1401,6 +1431,36 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             end
 
             gridWalls{j,1} = cat(1,gridWall{:});
+        end
+        
+        for j = 1:wallsCount
+            for m = 1:doorsCount
+                if doorsSpec(m).WallNumber == j
+                    FV.faces = doors{m,1}.ConnectivityList;
+                    FV.vertices = doors{m,1}.Points;
+                    distances = point2trimesh(FV,'QueryPoints',gridWalls{j,1});
+                    [mGridWall,~] = size(gridWalls{j,1});
+                    for b = mGridWall:-1:1
+                        if abs(distances(b,1)) <= camW
+                            gridWalls{j,1}(b,:) = [];
+                        end
+                    end
+                end
+            end
+
+            for m = 1:windowsCount
+                if windowsSpec(m).WallNumber == j
+                    FV.faces = windows{m,1}.ConnectivityList;
+                    FV.vertices = windows{m,1}.Points;
+                    distances = point2trimesh(FV,'QueryPoints',gridWalls{j,1});
+                    [mGridWall,~] = size(gridWalls{j,1});
+                    for b = mGridWall:-1:1
+                        if abs(distances(b,1)) <= camW
+                            gridWalls{j,1}(b,:) = [];
+                        end
+                    end
+                end
+            end
         end
 
         % Расчёт сетки точек для потолка
