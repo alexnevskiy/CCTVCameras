@@ -269,14 +269,18 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     
     pointsH = zeros(pointsNumberH,1);
     for i = 1:pointsNumberH         % Общие координаты точек сетки по Z
-        pointsH(i,1) = camH + heightLimit + gridStep * i;
+        if pointsNumberH == 1
+            pointsH(i,1) = camH + heightLimit + wallAvailableH / 2;
+        else
+            pointsH(i,1) = camH + heightLimit + gridStep * i;
+        end
     end
     
     % Расчёт сетки точек для стен
     for i = 1:wallsCount
         wallW = roomSize(i,1);                              % Ширина стены
         wallAvailableW = wallW - 2 * camW;                  % Доступная часть стены
-        pointsNumberW = floor(wallAvailableW / gridStep);   % Количество точек сетки
+        pointsNumberW = ceil(wallAvailableW / gridStep);   % Количество точек сетки
         
         startPoint = wallsPts(roofPtsOrder(i,1),:);         % Начальная координата стены
         endPoint = wallsPts(roofPtsOrder(i,2),:);           % Конечная координата стены
@@ -286,7 +290,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         
         pointsW = zeros(pointsNumberW,2);                   % Точки сетки по ширине
         for k = 1:pointsNumberW
-            pointsW(k,:) = camWScaled + directionScaled * gridStep * k;
+            pointsW(k,:) = camWScaled + directionScaled * gridStep * (k - 1);
         end
         
         gridWall = cell(pointsNumberH,1);                   % Точки сетки по высоте
@@ -1405,7 +1409,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         for j = 1:wallsCount
             wallW = roomSize(j,1);                              % Ширина стены
             wallAvailableW = wallW - 2 * camW;                  % Доступная часть стены
-            pointsNumberW = floor(wallAvailableW / gridStep);   % Количество точек сетки
+            pointsNumberW = ceil(wallAvailableW / gridStep);   % Количество точек сетки
             if pointsNumberW == 0 && gridStep > wallAvailableW
                 pointsNumberW = 1;
             end
@@ -1418,11 +1422,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
 
             pointsW = zeros(pointsNumberW,2);                   % Точки сетки по ширине
             for m = 1:pointsNumberW
-                if pointsNumberW == 1
-                    pointsW(m,:) = camWScaled + directionScaled * (wallAvailableW / 2);
-                else
-                    pointsW(m,:) = camWScaled + directionScaled * gridStep * m;
-                end
+                pointsW(m,:) = camWScaled + directionScaled * gridStep * (m - 1);
             end
 
             gridWall = cell(pointsNumberH,1);                   % Точки сетки по высоте
