@@ -1,6 +1,7 @@
 function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     farClipPlane,camPos,heightLimit,heightLimitIdent,numberOfObjects,...
-    wallsPts,roomH,doorsSpec,windowsSpec,gridStep,camW,camD,camH,nearClipPlaneDist)
+    wallsPts,roomH,doorsSpec,windowsSpec,gridStep,camW,camD,camH,nearClipPlaneDist,...
+    camDist,angleOfLight)
 
     identPPM = 250;
     recogPPM = 125;
@@ -682,7 +683,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                
     bRoomH = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81+130,54+distV*5,50,23],...
                   'Value', roomH, 'String', roomH, 'Callback', {@update3DPointS});
-    uicontrol('Parent',f,'Style','text','Position',[81+130,25+distV*5,50,23],...
+    uicontrol('Parent',f,'Style','text','Position',[81+130,25+distV*5,50,25],...
                     'String','Room Height','BackgroundColor',bgcolor);
                 
     bNearClipPlane = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81+130,54+distV*4,50,23],...
@@ -702,13 +703,23 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
 
     bCamD = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*2+130,54+distV*4,50,23],...
                   'Value', camD, 'String', camD, 'Callback', {@update3DPointS});
-    uicontrol('Parent',f,'Style','text','Position',[81*2+130,25+distV*4,50,23],...
+    uicontrol('Parent',f,'Style','text','Position',[81*2+130,25+distV*4,50,25],...
                     'String','Camera Depth','BackgroundColor',bgcolor);
     
     bCamH = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*2+130,54+distV*5,50,23],...
                   'Value', camH, 'String', camH, 'Callback', {@update3DPointS});
-    uicontrol('Parent',f,'Style','text','Position',[81*2+130,25+distV*5,50,23],...
+    uicontrol('Parent',f,'Style','text','Position',[81*2+130,25+distV*5,50,25],...
                     'String','Camera Height','BackgroundColor',bgcolor);
+                
+    bCamDist = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*3+130,54+distV*3,50,23],...
+                  'Value', camDist, 'String', camDist);
+    uicontrol('Parent',f,'Style','text','Position',[81*3+130,25+distV*3,50,23],...
+                    'String','Camera Distance','BackgroundColor',bgcolor);
+
+    bAngleOfLight = uicontrol('Parent', f, 'Style', 'edit', 'Position', [81*3+130,54+distV*4,50,23],...
+                  'Value', angleOfLight, 'String', angleOfLight);
+    uicontrol('Parent',f,'Style','text','Position',[81*3+130,25+distV*4,50,25],...
+                    'String','Angle Of Light','BackgroundColor',bgcolor);
     
     bNumberOfObjects = uicontrol('Parent', f, 'Style', 'popupmenu', 'Position', [81*4+distH+251,54+distV*3/2,50,23],...
                    'Value', numberOfObjects + 1, 'String', {'0','1','2','3','4','5'}, 'Callback', {@update3DPointS});
@@ -2105,6 +2116,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
 
     function bestCameraLocation(~,~)
         simpleAlgorithm = get(bSimpleAlgorithm,'Value');
+        camDist = str2double(get(bCamDist,'String'));
+        angleOfLight = str2double(get(bAngleOfLight,'String'));
         
         if (fovH >= 180)
             possibleRotateH = 1;
@@ -2125,6 +2138,8 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                 possibleRotateH,possibleRotateV);
 
         tFrustum = 0;                   % Время нахождения координат точек основания frustum
+        tFlash = 0;                     % Время определения засветов
+        tFlashCount = 0;                % Счётчик для frustum
         tPlaneInter = 0;                % Время нахождения точек пересечения frustum с плоскостью пола
         tFrustumCount = 0;              % Счётчик для frustum
         tInterCameraP = 0;              % Время разрезания объекта плоскостью камеры
@@ -2204,6 +2219,42 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                             findFrustumBase(monitorCenter1,fovHTan,fovVTan,R1,monitorDist);
                         [upRightFar1,upLeftFar1,~,~] = findFrustumBase(fcpCenter1,fovHTan,fovVTan,R1,farClipPlane);
                         tFrustum = tFrustum + toc(tFrustumStart);
+                        
+                        tFlashStart = tic;
+                        triangulatedFrustum = getTriangulatedFrustum(camPos1,...
+                            upRightMonitor1,upLeftMonitor1,downRightMonitor1,downLeftMonitor1);
+                        flash = false;
+                        for w = 1:windowsCount
+                            frustum = struct;
+                            frustum.faces = triangulatedFrustum.ConnectivityList;
+                            frustum.vertices = triangulatedFrustum.Points;
+                            inFrustum = in_polyhedron(frustum,windows{w,1}.Points);
+                            if nnz(inFrustum) == 0
+                                continue;
+                            end
+                            FV1 = struct;
+                            FV1.faces = windows{w,1}.ConnectivityList;
+                            FV1.vertices = windows{w,1}.Points;
+                            distance = point2trimesh(FV1,'QueryPoints',camPos1);
+                            camDistScaled = camDist * (windowsSpec(w).WindowWidth / 2);
+                            if distance >= camDistScaled
+                                continue;
+                            end
+                            windowNormal = faceNormal(room{windowsSpec(w).WallNumber,1},1);
+                            camWindowAngle = 180 - 2 * atand(norm(T1 * norm(windowNormal) - ...
+                                norm(T1) * windowNormal) / norm(T1 * ...
+                                norm(windowNormal) + norm(T1) * windowNormal));
+                            if camWindowAngle <= angleOfLight
+                                flash = true;
+                                break;
+                            end
+                        end
+                        tFlash = tFlash + toc(tFlashStart);
+                        tFlashCount = tFlashCount + 1;
+                        
+                        if flash
+                            continue;
+                        end
 
                         tPlaneInterStart = tic;
                         % Нахождение точек пересечения frustum с плоскостью пола
@@ -2607,6 +2658,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         tEnd = toc(tStart);
         
         tFrustum = tFrustum / tFrustumCount;
+        tFlash = tFlash / tFlashCount;
         tPlaneInter = tPlaneInter / tFrustumCount;
         tInterCameraP = tInterCameraP / tInterCameraPCount;
         tInterCameraW = tInterCameraW / tInterCameraWCount;
@@ -2623,6 +2675,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         disp('======================================================');
         disp(['Нахождение координат точек основания frustum: ',...
             num2str(tFrustum)]);
+        disp(['Определение засветов: ', num2str(tFlash)]);
         disp(['Нахождение точек пересечения frustum с плоскостью пола: ',...
             num2str(tPlaneInter)]);
         disp(['Разрезание объекта (parallelepiped) плоскостью камеры (nearClipPlane): ',...

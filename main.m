@@ -18,7 +18,10 @@ camW = 0.145;               % Ширина камеры
 camD = 0.333;               % Глубина камеры
 camH = 0.145;               % Высота камеры
 nearClipPlaneDist = 1e-1;   % Расстояние до ближней плоскости сечения камеры
+camDist = 15;               % Допустимое расстояние до камеры от источника света
+angleOfLight = 30;          % Допустимый угол между источником света и камерой
 
 plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     farClipPlane,camPos,heightLimit,heightLimitIdent,numberOfObjects,...
-    wallsPts,roomH,doorsSpec,windowsSpec,gridStep,camW,camD,camH,nearClipPlaneDist)
+    wallsPts,roomH,doorsSpec,windowsSpec,gridStep,camW,camD,camH,nearClipPlaneDist,...
+    camDist,angleOfLight)
