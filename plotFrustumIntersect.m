@@ -1413,35 +1413,6 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         interDetectPoly = intersect(interDetectPoly,floorPoly);
         interMonitorPoly = intersect(interMonitorPoly,floorPoly);
         
-%         doorsVisible = false(doorsCount,1);
-%         for d = 1:doorsCount
-%             if strcmp(doorsSpec(d).WhereOpen,'inside')
-%                 wallNumber1 = doorsSpec(d).WallNumber;
-%                 startPoint1 = wallsPts(roofPtsOrder(wallNumber1,1),:);
-%                 endPoint1 = wallsPts(roofPtsOrder(wallNumber1,2),:);
-%                 direction1 = endPoint1 - startPoint1;
-%                 directionScaled1 = direction1/norm(direction1);
-% 
-%                 doorStart1 = startPoint1 + directionScaled1 * doorsSpec(d).DistanceToDoor;
-%                 doorCenter = doorStart1 + directionScaled1 * doorsSpec(d).DoorWidth / 2;
-% 
-%                 if dot(camPos(1,1:2) - doorCenter, directionScaled1) < eps
-%                     continue;
-%                 end
-%             end
-%             
-%             doorPoints = [doors{d,1}.Points(1,1:2) heightLimit; doors{d,1}.Points(4,1:2) heightLimit];
-%             doorsVisibleFrustum = getTriangulatedFrustum(camPos,...
-%                 upRightRecog,upLeftRecog,downRightRecog,downLeftRecog);
-%             frustum.faces = doorsVisibleFrustum.ConnectivityList;
-%             frustum.vertices = doorsVisibleFrustum.Points;
-%             inSightFrustum = in_polyhedron(frustum,doorPoints);
-%             
-%             if nnz(inSightFrustum) == 2
-%                 doorsVisible(d,1) = true;
-%             end
-%         end
-        
         % Определение доступного места для установки камеры и вычисление сетки
         % точек возможных положений камеры (без учёта окон и дверей)
         gridWalls = cell(wallsCount,1);
@@ -2492,20 +2463,37 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                                 doorStart1 = startPoint1 + directionScaled1 * doorsSpec(d).DistanceToDoor;
                                 doorCenter = doorStart1 + directionScaled1 * doorsSpec(d).DoorWidth / 2;
                                 
-                                if dot(camPos1(1,1:2) - doorCenter, directionScaled1) < 0
+                                if dot(camPos1(1,1:2) - doorCenter, directionScaled1) < eps
                                     continue;
                                 end
                             end
                             
-                            doorPoints = [doors{d,1}.Points(1,1:2) heightLimit; doors{d,1}.Points(4,1:2) heightLimit];
-                            doorsVisibleFrustum = getTriangulatedFrustum(camPos,...
-                                upRightRecog,upLeftRecog,downRightRecog,downLeftRecog);
-                            identFrustum = struct;
-                            identFrustum.faces = doorsVisibleFrustum.ConnectivityList;
-                            identFrustum.vertices = doorsVisibleFrustum.Points;
-                            inSightFrustum = in_polyhedron(identFrustum,doorPoints);
+                            doorNormal = faceNormal(room{doorsSpec(d).WallNumber,1},1);
+                            doorPoints = [doors{d,1}.Points(1,:) + doorNormal * 0.001; 
+                                doors{d,1}.Points(4,:) + doorNormal * 0.001];
+                            inIdent = inpolygon(doorPoints(:,1),doorPoints(:,2),...
+                                interIdentPoly1.Vertices(:,1),interIdentPoly1.Vertices(:,2));
+                            identNumber = nnz(inIdent);
+                            if identNumber == 2
+                                doorsVisible(d,1) = true;
+                                continue;
+                            end
 
-                            if nnz(inSightFrustum) == 2
+                            inRecog = inpolygon(doorPoints(:,1),doorPoints(:,2),...
+                            interRecogPoly1.Vertices(:,1),interRecogPoly1.Vertices(:,2));
+
+                            recogNumber = nnz(inRecog);
+                            if recogNumber == 0 || recogNumber == 1 && identNumber == 0
+                                continue;
+                            elseif recogNumber == 1 && identNumber == 1
+                                recogIndex = find(inRecog);
+                                identIndex = find(inIdent);
+                                if recogIndex == identIndex
+                                    continue;
+                                else
+                                    doorsVisible(d,1) = true;
+                                end
+                            else
                                 doorsVisible(d,1) = true;
                             end
                         end
