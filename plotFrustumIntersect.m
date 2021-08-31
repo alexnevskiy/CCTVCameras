@@ -2545,7 +2545,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                                     break;
                                 end
                             elseif visibleDiff < 0
-                                if Location.area / doorsPriority.^visibleDiff >= bestWallLocation{b,1}.area
+                                if Location.area / doorsPriority.^abs(visibleDiff) >= bestWallLocation{b,1}.area
                                     compare = true;
                                     break;
                                 end
@@ -2591,9 +2591,9 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         end
         
         for m = 1:wallsCount
-            empty = false;
-            compare = false;
             for a = 1:5
+                empty = false;
+                compare = false;
                 for b = 1:5 
                     if isempty(bestLocation{b,1})
                         bestLocation{b,1} = bestWallsLocation{m,1}{a,1};
@@ -2607,7 +2607,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                             break;
                         end
                     elseif visibleDiff < 0
-                        if bestWallsLocation{m,1}{a,1}.area / doorsPriority.^visibleDiff >= bestLocation{b,1}.area
+                        if bestWallsLocation{m,1}{a,1}.area / doorsPriority.^abs(visibleDiff) >= bestLocation{b,1}.area
                             compare = true;
                             break;
                         end
