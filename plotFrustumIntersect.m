@@ -2498,7 +2498,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                             alphaA = acosd(doorNormal(1,3) / sqrt(doorNormal(1,1).^2 + doorNormal(1,2).^2 + doorNormal(1,3).^2));
                             alphaB = acosd(T1(1,3) / sqrt(T1(1,1).^2 + T1(1,2).^2 + T1(1,3).^2));
                             angleV = abs(alphaA - alphaB);
-                            doorsAngles(d,1) = angleH;
+                            doorsAngles(d,1) = 180 - abs(angleH);
                             doorsAngles(d,2) = angleV;
                             
                             if strcmp(doorsSpec(d).WhereOpen,'inside')
@@ -2521,29 +2521,11 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                             
                             doorPoints = [doors{d,1}.Points(1,:) + doorNormal * 0.001; 
                                 doors{d,1}.Points(4,:) + doorNormal * 0.001];
+                            identPoly = union(interIdentPoly1, interRecogPoly1);
                             inIdent = inpolygon(doorPoints(:,1),doorPoints(:,2),...
-                                interIdentPoly1.Vertices(:,1),interIdentPoly1.Vertices(:,2));
+                                identPoly.Vertices(:,1),identPoly.Vertices(:,2));
                             identNumber = nnz(inIdent);
                             if identNumber == 2
-                                doorsVisible(d,1) = true;
-                                continue;
-                            end
-
-                            inRecog = inpolygon(doorPoints(:,1),doorPoints(:,2),...
-                            interRecogPoly1.Vertices(:,1),interRecogPoly1.Vertices(:,2));
-
-                            recogNumber = nnz(inRecog);
-                            if recogNumber == 0 || (recogNumber == 1 && identNumber == 0)
-                                continue;
-                            elseif recogNumber == 1 && identNumber == 1
-                                recogIndex = find(inRecog);
-                                identIndex = find(inIdent);
-                                if recogIndex == identIndex
-                                    continue;
-                                else
-                                    doorsVisible(d,1) = true;
-                                end
-                            else
                                 doorsVisible(d,1) = true;
                             end
                         end
