@@ -504,6 +504,31 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
     frustumRightMonitor = fill3(PMonitor(indRight, 1), PMonitor(indRight, 2), PMonitor(indRight, 3), monitorColor);
     hold on
     
+    set(frustumUpIdent, 'visible', 'off');
+    set(frustumLeftIdent, 'visible', 'off');
+    set(frustumDownIdent, 'visible', 'off');
+    set(frustumRightIdent, 'visible', 'off');
+
+    set(frustumUpRecog, 'visible', 'off');
+    set(frustumLeftRecog, 'visible', 'off');
+    set(frustumDownRecog, 'visible', 'off');
+    set(frustumRightRecog, 'visible', 'off');
+
+    set(frustumUpVisib, 'visible', 'off');
+    set(frustumLeftVisib, 'visible', 'off');
+    set(frustumDownVisib, 'visible', 'off');
+    set(frustumRightVisib, 'visible', 'off');
+
+    set(frustumUpDetect, 'visible', 'off');
+    set(frustumLeftDetect, 'visible', 'off');
+    set(frustumDownDetect, 'visible', 'off');
+    set(frustumRightDetect, 'visible', 'off');
+
+    set(frustumUpMonitor, 'visible', 'off');
+    set(frustumLeftMonitor, 'visible', 'off');
+    set(frustumDownMonitor, 'visible', 'off');
+    set(frustumRightMonitor, 'visible', 'off');
+    
     % Построение помещения
     roomPlot = cell(wallsCount + 1,1);
     quiverPlot = cell(wallsCount + 1,1);
@@ -654,7 +679,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                     'String','Priority Of Doors','BackgroundColor',bgcolor);
                 
     bFrustum = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54-distV/2,130,23],...
-                   'Value', 1, 'String', 'Frustum', 'Callback', {@update3DPointS});
+                   'Value', 0, 'String', 'Frustum', 'Callback', {@update3DPointS});
                
     bInter = uicontrol('Parent', f, 'Style', 'checkbox', 'Position', [81*4+distH,54,130,23],...
                    'Value', 1, 'String', 'Visibility Area', 'Callback', {@update3DPointS});
@@ -1412,6 +1437,19 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
         interVisibPoly = intersect(interVisibPoly,floorPoly);
         interDetectPoly = intersect(interDetectPoly,floorPoly);
         interMonitorPoly = intersect(interMonitorPoly,floorPoly);
+        
+        % Нахождение углов между камерой и дверьми
+        for j = 1:doorsCount
+            F1 = faceNormal(room{doorsSpec(j).WallNumber,1},1);
+            angleH = atan2d(F1(1,1) * T(1,2) - F1(1,2) * T(1,1), ...
+                F1(1,1) * T(1,1) + F1(1,2) * T(1,2));
+            alphaA = acosd(F1(1,3) / sqrt(F1(1,1).^2 + F1(1,2).^2 + F1(1,3).^2));
+            alphaB = acosd(T(1,3) / sqrt(T(1,1).^2 + T(1,2).^2 + T(1,3).^2));
+            angleV = abs(alphaA - alphaB);
+            disp([num2str(j),' дверь:']);
+            disp(['Горизонтальный угол: ',num2str(180 - abs(angleH))]);
+            disp(['Вертикальный угол: ',num2str(angleV)]);
+        end
         
         % Определение доступного места для установки камеры и вычисление сетки
         % точек возможных положений камеры (без учёта окон и дверей)
@@ -2452,13 +2490,26 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         % дверей
                         tDoorsVisibleStart = tic;
                         doorsVisible = false(doorsCount,1);
+                        doorsAngles = zeros(doorsCount,2);
                         for d = 1:doorsCount
+                            doorNormal = faceNormal(room{doorsSpec(d).WallNumber,1},1);
+                            angleH = atan2d(doorNormal(1,1) * T1(1,2) - doorNormal(1,2) * T1(1,1), ...
+                                    doorNormal(1,1) * T1(1,1) + doorNormal(1,2) * T1(1,2));
+                            alphaA = acosd(doorNormal(1,3) / sqrt(doorNormal(1,1).^2 + doorNormal(1,2).^2 + doorNormal(1,3).^2));
+                            alphaB = acosd(T1(1,3) / sqrt(T1(1,1).^2 + T1(1,2).^2 + T1(1,3).^2));
+                            angleV = abs(alphaA - alphaB);
+                            doorsAngles(d,1) = angleH;
+                            doorsAngles(d,2) = angleV;
+                            
                             if strcmp(doorsSpec(d).WhereOpen,'inside')
                                 wallNumber1 = doorsSpec(d).WallNumber;
                                 startPoint1 = wallsPts(roofPtsOrder(wallNumber1,1),:);
                                 endPoint1 = wallsPts(roofPtsOrder(wallNumber1,2),:);
                                 direction1 = endPoint1 - startPoint1;
                                 directionScaled1 = direction1/norm(direction1);
+                                if strcmp(doorsSpec(d).Doorhandle,'back')
+                                    directionScaled1 = -directionScaled1;
+                                end
                                 
                                 doorStart1 = startPoint1 + directionScaled1 * doorsSpec(d).DistanceToDoor;
                                 doorCenter = doorStart1 + directionScaled1 * doorsSpec(d).DoorWidth / 2;
@@ -2468,7 +2519,6 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                                 end
                             end
                             
-                            doorNormal = faceNormal(room{doorsSpec(d).WallNumber,1},1);
                             doorPoints = [doors{d,1}.Points(1,:) + doorNormal * 0.001; 
                                 doors{d,1}.Points(4,:) + doorNormal * 0.001];
                             inIdent = inpolygon(doorPoints(:,1),doorPoints(:,2),...
@@ -2483,7 +2533,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                             interRecogPoly1.Vertices(:,1),interRecogPoly1.Vertices(:,2));
 
                             recogNumber = nnz(inRecog);
-                            if recogNumber == 0 || recogNumber == 1 && identNumber == 0
+                            if recogNumber == 0 || (recogNumber == 1 && identNumber == 0)
                                 continue;
                             elseif recogNumber == 1 && identNumber == 1
                                 recogIndex = find(inRecog);
@@ -2527,6 +2577,7 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
                         Location.interDetect = interDetectPoly1;
                         Location.interMonitor = interMonitorPoly1;
                         Location.doorsVisible = doorsVisible;
+                        Location.doorsAngles = doorsAngles;
                         tLocation = tLocation + toc(tLocationStart);
                         tLocationCount = tLocationCount + 1;
                         
@@ -2743,6 +2794,9 @@ function plotFrustumIntersect(W,H,pan,tilt,roll,fovH,fovV,...
             disp('======================================================');
             disp(['Площадь покрытия: ',num2str(bestLocation{j,1}.area)]);
             disp(['Количество покрытых дверей: ',num2str(nnz(bestLocation{j,1}.doorsVisible))]);
+            disp("Углы между камерой и дверьми:");
+            disp('    Horiz     Vertic');
+            disp(bestLocation{j,1}.doorsAngles);
             disp("Позиция камеры:");
             disp(bestLocation{j,1}.camPos);
             disp(['Pan: ',num2str(bestLocation{j,1}.pan)]);
